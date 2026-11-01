@@ -1,0 +1,16 @@
+# Node dependencies
+node_modules/
+
+# Environment variables & secrets (NEVER commit to git)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Coverage and cache
+coverage/
+.cache/

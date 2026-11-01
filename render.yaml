@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: goarts-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: goarts
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AZURE_MEDIA_KEY
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_KEY
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT
+        value: gpt-4o-mini
+      - key: AZURE_VISION_ENDPOINT
+        sync: false
+      - key: AZURE_VISION_KEY
+        sync: false
+      - key: AZURE_MAPS_KEY
+        sync: false
+      - key: AZURE_MEDIA_ENDPOINT
+        sync: false
+      - key: ADMIN_EMAIL
+        value: admin@goarts.ai
+      - key: ADMIN_PASSWORD
+        sync: false

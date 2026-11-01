@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gaBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#121826" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <linearGradient id="gaBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <linearGradient id="gaCrimson" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f87171" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+    <linearGradient id="gaGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <filter id="gaGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Base Rounded Badge -->
+  <rect width="64" height="64" rx="16" fill="url(#gaBg)" />
+  <rect width="62" height="62" x="1" y="1" rx="15" stroke="rgba(255,255,255,0.12)" stroke-width="1" />
+
+  <!-- Performing Arts Stage Spotlight Glow -->
+  <circle cx="32" cy="24" r="16" fill="#4285F4" opacity="0.18" filter="url(#gaGlow)" />
+
+  <!-- Performing Arts Dual Ribbon Crown (G & A monogram) -->
+  <!-- Left Performing Ribbon (Blue - Music & Stage) -->
+  <path d="M17 44 C15 36, 17 25, 25 18 C29 14, 32 15, 32 20 C32 26, 22 28, 22 36 C22 41, 26 44, 31 44 C34 44, 36 43, 37 41 L37 35 L29 35" 
+        stroke="url(#gaBlue)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Right Performing Ribbon (Crimson - Dance & Theater) -->
+  <path d="M47 44 C49 36, 47 25, 39 18 C35 14, 32 15, 32 20 C32 26, 42 28, 42 36 C42 41, 38 44, 33 44" 
+        stroke="url(#gaCrimson)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Center Cross Ribbon Tie -->
+  <path d="M25 35 L39 35" stroke="url(#gaGold)" stroke-width="3" stroke-linecap="round" />
+
+  <!-- Theatrical Star Talent Peak -->
+  <path d="M32 9 L33.5 13 L37.5 14.5 L33.5 16 L32 20 L30.5 16 L26.5 14.5 L30.5 13 Z" 
+        fill="url(#gaGold)" filter="url(#gaGlow)" />
+</svg>
