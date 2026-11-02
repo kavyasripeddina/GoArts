@@ -581,4 +581,373 @@ router.get('/talent-score/:artistId', (req, res) => {
   });
 });
 
+
+// POST /api/ai/talent-rating - Compute AI talent rating from artist data
+router.post('/talent-rating', async (req, res) => {
+  const { artistId, reviews, bookingCount, completedCount, rating, responseRate, socialFollowers, yearsActive } = req.body;
+  
+  // Try to get artist from db if artistId provided
+  let artist = null;
+  if (artistId) {
+    artist = db.artists.find(a => a.id === artistId);
+  }
+
+  // Compute score components
+  const ratingScore = Math.round(((rating || (artist?.rating) || 3.5) / 5) * 30);
+  const completionRate = (completedCount || 0) / Math.max(bookingCount || artist?.totalBookings || 1, 1);
+  const completionScore = Math.round(completionRate * 25);
+  const responseScore = Math.round(((responseRate || artist?.responseRate || 70) / 100) * 15);
+  const profileScore = Math.round(((artist?.profileScore || 60) / 100) * 20);
+  const verificationBonus = (artist?.verified || artist?.celebrity_verified) ? 10 : 0;
+  const socialBonus = socialFollowers > 100000 ? 5 : socialFollowers > 10000 ? 3 : 1;
+
+  const totalScore = Math.min(100, ratingScore + completionScore + responseScore + profileScore + verificationBonus + socialBonus);
+
+  const label = totalScore >= 85 ? 'Exceptional' : totalScore >= 70 ? 'Excellent' : totalScore >= 55 ? 'Good' : totalScore >= 40 ? 'Building' : 'Emerging';
+
+  res.json({
+    artistId,
+    talentScore: totalScore,
+    label,
+    breakdown: {
+      audienceRating: { score: ratingScore, max: 30, label: 'Audience Rating' },
+      bookingCompletion: { score: completionScore, max: 25, label: 'Booking Completion' },
+      responsiveness: { score: responseScore, max: 15, label: 'Responsiveness' },
+      profileQuality: { score: profileScore, max: 20, label: 'Profile Quality' },
+      verificationBonus: { score: verificationBonus, max: 10, label: 'Verified Identity' },
+      socialPresence: { score: socialBonus, max: 5, label: 'Social Presence' },
+    },
+    recommendations: totalScore < 50
+      ? ['Complete your profile to 100%', 'Request reviews from past clients', 'Respond to inquiries within 2 hours']
+      : totalScore < 75
+      ? ['Maintain high booking completion rates', 'Grow your social media presence', 'Submit for identity verification']
+      : ['Congratulations! Consider applying for Popular Artist status', 'Share your GoArts profile on social media'],
+    source: 'rule-based-ai',
+  });
+});
+
+// GET /api/ai/audience-analytics/:artistId - Audience analytics for artist
+router.get('/audience-analytics/:artistId', (req, res) => {
+  const artist = db.artists.find(a => a.id === req.params.artistId);
+  if (!artist) return res.status(404).json({ error: 'Artist not found.' });
+
+  const bookings = db.bookings.filter(b => b.artistId === artist.id);
+  const reviews = db.reviews.filter(r => r.artistId === artist.id && r.isPublished);
+  const completed = bookings.filter(b => b.status === 'completed');
+
+  // Aggregate event types
+  const eventTypeCounts = {};
+  bookings.forEach(b => {
+    const et = b.eventType || 'Other';
+    eventTypeCounts[et] = (eventTypeCounts[et] || 0) + 1;
+  });
+
+  // Aggregate cities
+  const cityCounts = {};
+  bookings.forEach(b => {
+    const city = b.venueCity || b.city || 'Unknown';
+    cityCounts[city] = (cityCounts[city] || 0) + 1;
+  });
+
+  // Monthly booking trend (last 6 months)
+  const now = new Date();
+  const monthlyTrend = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+    const count = bookings.filter(b => {
+      const bd = new Date(b.createdAt);
+      return bd.getFullYear() === d.getFullYear() && bd.getMonth() === d.getMonth();
+    }).length;
+    monthlyTrend.push({ month: label, bookings: count });
+  }
+
+  // Simulated audience engagement (deterministic from artist data)
+  const engagementRate = Math.min(98, 40 + (artist.rating || 4) * 10 + (completed.length * 2));
+  const avgAudienceSize = 150 + (completed.length * 25);
+  const repeatClientRate = completed.length > 3 ? Math.round((completed.length * 0.3)) : 0;
+
+  res.json({
+    artistId: artist.id,
+    artistName: artist.name,
+    analytics: {
+      totalBookings: bookings.length,
+      completedShows: completed.length,
+      averageRating: artist.rating || 0,
+      totalReviews: reviews.length,
+      engagementRate: Math.round(engagementRate),
+      estimatedAvgAudienceSize: avgAudienceSize,
+      repeatClientRate,
+      topEventTypes: Object.entries(eventTypeCounts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([type,count])=>({type,count})),
+      topCities: Object.entries(cityCounts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([city,count])=>({city,count})),
+      monthlyTrend,
+      popularSongs: artist.specialties || ['Performance Setlist', 'Original Compositions'],
+      crowdSentiment: artist.rating >= 4.5 ? 'Highly Positive' : artist.rating >= 4.0 ? 'Positive' : 'Mixed',
+    },
+    insights: [
+      `${artist.name} has completed ${completed.length} shows with an average rating of ${artist.rating || 'N/A'}/5`,
+      completed.length > 0 ? `Most popular event type: ${Object.entries(eventTypeCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'Various'}` : 'Build your booking history to unlock deeper analytics',
+      `Estimated audience engagement rate: ${Math.round(engagementRate)}%`,
+    ],
+    source: 'platform-analytics',
+  });
+});
+
+// POST /api/ai/predict-event - Event demand prediction
+router.post('/predict-event', async (req, res) => {
+  const { city, eventType, date, budget, audienceSize } = req.body;
+
+  if (!city && !eventType) {
+    return res.status(400).json({ error: 'Please provide city or event type for prediction.' });
+  }
+
+  // Rule-based demand prediction
+  const seasonalDemand = (() => {
+    if (!date) return 'Moderate';
+    const month = new Date(date).getMonth();
+    if ([10, 11, 0].includes(month)) return 'Very High'; // Nov-Jan: wedding season
+    if ([1, 2].includes(month)) return 'High'; // Feb-Mar
+    if ([3, 4, 5].includes(month)) return 'Low'; // Summer
+    if ([6, 7, 8].includes(month)) return 'Moderate'; // Monsoon
+    return 'High';
+  })();
+
+  const demandScore = { 'Very High': 92, 'High': 76, 'Moderate': 58, 'Low': 35 }[seasonalDemand];
+
+  const cityMultiplier = { 'Hyderabad': 1.2, 'Mumbai': 1.4, 'Delhi': 1.3, 'Bengaluru': 1.25, 'Chennai': 1.1 }[city] || 1.0;
+  const eventMultiplier = { 'Wedding': 1.3, 'Concert': 1.2, 'Corporate Event': 1.1, 'College Festival': 0.9 }[eventType] || 1.0;
+
+  const estimatedRevenue = budget
+    ? Math.round(Number(budget) * cityMultiplier * eventMultiplier)
+    : Math.round(100000 * cityMultiplier * eventMultiplier);
+
+  // Best booking dates
+  const bestDates = [];
+  const now = new Date();
+  for (let i = 1; i <= 90; i += 7) {
+    const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
+    const dayOfWeek = d.getDay();
+    if ([5, 6].includes(dayOfWeek)) { // Fri/Sat are peak
+      bestDates.push({
+        date: d.toISOString().split('T')[0],
+        day: d.toLocaleDateString('en-IN', { weekday: 'long' }),
+        demandLevel: i < 30 ? 'High' : 'Moderate',
+      });
+      if (bestDates.length >= 3) break;
+    }
+  }
+
+  res.json({
+    prediction: {
+      city: city || 'Not specified',
+      eventType: eventType || 'General',
+      seasonalDemand,
+      demandScore,
+      demandLabel: demandScore >= 80 ? 'Peak Season' : demandScore >= 60 ? 'Good Season' : demandScore >= 40 ? 'Average' : 'Off-Peak',
+      estimatedRevenue: `₹${estimatedRevenue.toLocaleString('en-IN')}`,
+      revenueRange: { min: `₹${Math.round(estimatedRevenue * 0.8).toLocaleString('en-IN')}`, max: `₹${Math.round(estimatedRevenue * 1.3).toLocaleString('en-IN')}` },
+      bestDates,
+      recommendations: [
+        demandScore >= 80 ? 'Book artists at least 8-10 weeks in advance for peak season' : 'Good availability — book 4-6 weeks ahead',
+        cityMultiplier > 1.1 ? `${city} is a high-demand market — early booking recommended` : 'Moderate market — standard lead times apply',
+        'Use GoArts AI Event Planner to optimize your artist lineup and budget',
+      ],
+    },
+    source: 'goarts-demand-engine',
+  });
+});
+
+// POST /api/ai/generate-poster - AI poster concept generator
+router.post('/generate-poster', async (req, res) => {
+  const { eventName, date, venue, artistName, theme, genre } = req.body;
+
+  if (!eventName) {
+    return res.status(400).json({ error: 'Event name is required.' });
+  }
+
+  // Try Azure OpenAI first
+  try {
+    const azureRes = await callAzureOpenAI([
+      { role: 'system', content: 'You are a creative event poster designer. Generate a detailed poster concept as JSON with fields: tagline, colorPalette (array of 3 hex colors), fontStyle, layoutDescription, visualElements, mood.' },
+      { role: 'user', content: `Create a poster concept for: Event: ${eventName}, Artist: ${artistName || 'Various Artists'}, Date: ${date || 'TBD'}, Venue: ${venue || 'TBD'}, Theme: ${theme || 'Modern'}, Genre: ${genre || 'Music'}` },
+    ]);
+    if (azureRes?.content) {
+      const parsed = JSON.parse(azureRes.content.match(/\{[\s\S]*\}/)?.[0] || '{}');
+      if (parsed.tagline || parsed.colorPalette) {
+        return res.json({ concept: { ...parsed, eventName, artistName, date, venue }, source: 'azure-openai' });
+      }
+    }
+  } catch {}
+
+  // Rule-based poster concept
+  const themeMap = {
+    'Wedding': { colors: ['#FFD700', '#FFF8E7', '#8B6914'], mood: 'Elegant & Romantic', font: 'Serif Cursive' },
+    'Concert': { colors: ['#FF2D78', '#1A1A2E', '#E94560'], mood: 'Electric & Bold', font: 'Heavy Display' },
+    'Corporate': { colors: ['#003366', '#FFFFFF', '#0066CC'], mood: 'Professional & Clean', font: 'Sans-Serif Bold' },
+    'Festival': { colors: ['#FF6B35', '#F7C59F', '#EFEFD0'], mood: 'Vibrant & Celebratory', font: 'Rounded Display' },
+    'Classical': { colors: ['#2C1810', '#D4A853', '#F5F0E8'], mood: 'Timeless & Sophisticated', font: 'Elegant Serif' },
+  };
+
+  const themeKey = Object.keys(themeMap).find(k => (theme || genre || '').toLowerCase().includes(k.toLowerCase())) || 'Concert';
+  const themeData = themeMap[themeKey];
+
+  res.json({
+    concept: {
+      eventName,
+      artistName: artistName || 'Featured Artist',
+      date: date || 'Date TBD',
+      venue: venue || 'Venue TBD',
+      tagline: `${eventName} — An Unforgettable ${genre || 'Music'} Experience`,
+      colorPalette: themeData.colors,
+      fontStyle: themeData.font,
+      mood: themeData.mood,
+      layoutDescription: `Full-bleed background in ${themeData.colors[1]}. Artist name prominently at top 1/3. Event name centered in large ${themeData.font} type. Date & venue in lower third. GoArts watermark bottom-right.`,
+      visualElements: ['Dynamic spotlight rays', 'Artist silhouette or photo', 'Crowd silhouette at base', 'Star/confetti elements'],
+      printSpecs: { width: '24 inches', height: '36 inches', resolution: '300 DPI', format: 'CMYK' },
+    },
+    source: 'rule-based-designer',
+  });
+});
+
+// POST /api/ai/social-content - AI social media content generator
+router.post('/social-content', async (req, res) => {
+  const { artistName, eventName, eventDate, venue, platform, tone, genre } = req.body;
+
+  if (!artistName && !eventName) {
+    return res.status(400).json({ error: 'Artist name or event name required.' });
+  }
+
+  const subject = eventName ? `${eventName}${artistName ? ` featuring ${artistName}` : ''}` : `${artistName}'s performance`;
+  const eventDateStr = eventDate ? new Date(eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'soon';
+
+  const platformContent = {
+    instagram: {
+      caption: `🎤 ${subject} is HAPPENING ${eventDateStr}! ${venue ? `📍 ${venue}` : ''}\n\nBook your tickets now and be part of a magical evening! 🌟\n\n✨ Verified on GoArts AI\n📲 Link in bio to book`,
+      hashtags: [`#${(artistName || '').replace(/\s+/g, '')}`, '#GoArtsAI', '#LiveMusic', '#IndianArtist', `#${(genre || 'Music').replace(/\s+/g, '')}`, '#Entertainment', '#BookNow', '#ConcertLife', '#IndiaEvents', '#VerifiedArtist'],
+      postingTime: 'Post Tuesday-Thursday between 6 PM - 9 PM IST for maximum reach',
+      storyIdea: `Countdown sticker: "${Math.ceil((new Date(eventDate || new Date()) - new Date()) / 86400000)} days to go!" with event details`,
+    },
+    twitter: {
+      caption: `🎶 Don't miss ${subject}! ${eventDate ? `📅 ${eventDateStr}` : ''} ${venue ? `📍 ${venue}` : ''}\n\nBook now on @GoArtsAI 🎫`,
+      hashtags: [`#${(artistName || '').replace(/\s+/g, '')}`, '#GoArts', '#LiveMusic', '#IndianEntertainment', '#BookNow'],
+      postingTime: 'Best times: Weekdays 8-10 AM or 7-9 PM IST',
+      threadIdea: `Thread: "5 reasons why you can't miss ${subject}" to drive engagement`,
+    },
+    linkedin: {
+      caption: `We are proud to announce ${subject}${venue ? ` at ${venue}` : ''} on ${eventDateStr}.\n\nThis event promises to be a landmark celebration of Indian performing arts. Secure your spot through GoArts AI — India's verified talent marketplace.\n\n#GoArts #PerformingArts #LiveEvents #IndianCulture`,
+      hashtags: ['#GoArtsAI', '#LivePerformance', '#EventManagement', '#IndianArtists', '#CorporateEvents'],
+      postingTime: 'Best times: Tuesday-Thursday 9 AM - 12 PM IST',
+    },
+    youtube: {
+      caption: `${subject} | ${venue || 'Live Performance'} | ${eventDateStr}\n\nJoin us for an incredible evening of ${genre || 'music'} with ${artistName || 'our featured artist'}!\n\nBook tickets: goarts.ai | Platform Commission: 15% | Verified Artists Only`,
+      hashtags: [`#${(artistName || '').replace(/\s+/g, '')}`, '#LivePerformance', '#GoArtsAI', '#IndianMusic', '#Concert2026'],
+      thumbnailTip: 'Use high-contrast photo of artist with bold event title text overlay in brand colors',
+    },
+  };
+
+  const selectedPlatform = platform?.toLowerCase() || 'instagram';
+  const content = platformContent[selectedPlatform] || platformContent.instagram;
+
+  res.json({
+    platform: selectedPlatform,
+    subject,
+    content,
+    allPlatforms: platformContent,
+    contentCalendar: [
+      { week: 'Week 1 (Announcement)', action: `Drop teaser post — "Something big is coming! 👀"`, platforms: ['instagram', 'twitter'] },
+      { week: 'Week 2 (Reveal)', action: `Full announcement with poster and booking link`, platforms: ['instagram', 'twitter', 'linkedin'] },
+      { week: 'Week 3 (Engagement)', action: `Behind-the-scenes content and artist Q&A reel`, platforms: ['instagram', 'youtube'] },
+      { week: 'Event Week', action: `Daily countdown, stories, and live coverage`, platforms: ['instagram', 'twitter'] },
+      { week: 'Post-Event', action: `Highlights reel and audience reviews`, platforms: ['youtube', 'instagram'] },
+    ],
+    source: 'goarts-social-engine',
+  });
+});
+
+// GET /api/ai/subscription-plans - Artist premium subscription plans
+router.get('/subscription-plans', (req, res) => {
+  res.json({
+    plans: [
+      {
+        id: 'basic',
+        name: 'Basic',
+        price: 999,
+        billingCycle: 'month',
+        currency: '₹',
+        tagline: 'Get started on GoArts AI',
+        color: '#6B7280',
+        features: [
+          'Verified Artist Profile',
+          'Up to 10 booking requests/month',
+          'Basic analytics dashboard',
+          'GoArts AI Chat support',
+          'Standard search listing',
+          'Booking calendar management',
+        ],
+        limitations: ['No featured placement', 'No AI marketing tools', 'Standard commission rate (15%)'],
+        cta: 'Start Basic',
+        popular: false,
+      },
+      {
+        id: 'pro',
+        name: 'Pro',
+        price: 2999,
+        billingCycle: 'month',
+        currency: '₹',
+        tagline: 'Grow your artist brand',
+        color: '#4285F4',
+        features: [
+          'Everything in Basic',
+          'Featured listing in search results',
+          'Priority visibility in Explore Artists',
+          'Advanced analytics & audience insights',
+          'AI Talent Rating badge',
+          'Unlimited booking requests',
+          'Promotional banner on profile',
+          'Reduced commission rate (12%)',
+          'Social media content suggestions',
+        ],
+        limitations: ['No AI video generation', 'No dedicated lead generation'],
+        cta: 'Go Pro',
+        popular: true,
+        badge: 'Most Popular',
+      },
+      {
+        id: 'elite',
+        name: 'Elite',
+        price: 9999,
+        billingCycle: 'month',
+        currency: '₹',
+        tagline: 'Dominate the market',
+        color: '#BC4639',
+        features: [
+          'Everything in Pro',
+          'AI Marketing Suite (poster, video, social)',
+          'Dedicated lead generation campaigns',
+          'Brand partnership opportunities',
+          'Sponsored event placement',
+          'AI Video Reel Generator',
+          'AI Poster Creator',
+          'AI Social Media Manager',
+          'Priority customer support (24x7)',
+          'Lowest commission rate (10%)',
+          'Verified Elite Badge on profile',
+          'Analytics export (PDF/CSV)',
+        ],
+        limitations: [],
+        cta: 'Go Elite',
+        popular: false,
+        badge: 'Maximum Impact',
+      },
+    ],
+    revenueStreams: [
+      { name: 'Booking Commission', description: '10–20% per confirmed booking (varies by plan)', icon: '💰' },
+      { name: 'Artist Premium Plans', description: 'Monthly subscription revenue from Basic, Pro, and Elite tiers', icon: '⭐' },
+      { name: 'Advertising Revenue', description: 'Targeted ads from music brands, audio equipment, event companies, and fashion brands', icon: '📢' },
+      { name: 'Sponsorship Revenue', description: 'Corporate-sponsored festivals, concerts, and cultural events', icon: '🏆' },
+    ],
+    source: 'goarts-pricing-engine',
+  });
+});
+
 export default router;

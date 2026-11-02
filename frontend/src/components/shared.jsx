@@ -217,6 +217,8 @@ export const Navbar = ({ transparent = false }) => {
             ['Open Gigs Board', '/events'],
             ['Leaderboard', '/leaderboard'],
             ['AI Planner', '/ai-planner'],
+            ['AI Studio', '/ai-ecosystem'],
+            ['Premium', '/premium'],
             ['How It Works', '/#how-it-works']
           ].map(([label, href]) => (
             <Link key={label} to={href} style={{ padding: '0.5rem 0.875rem', color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 500, borderRadius: '8px', transition: 'all 0.2s' }}
@@ -521,6 +523,8 @@ export const Navbar = ({ transparent = false }) => {
             ['Open Gigs Board', '/events'],
             ['Leaderboard', '/leaderboard'],
             ['AI Planner', '/ai-planner'],
+            ['AI Studio', '/ai-ecosystem'],
+            ['Premium', '/premium'],
             ['How It Works', '/#how-it-works']
           ].map(([label, href]) => (
             <Link key={label} to={href} onClick={() => setMobileOpen(false)} style={{ display: 'block', padding: '0.75rem 1rem', color: 'var(--text-secondary)', fontSize: '0.9rem', borderRadius: '8px' }}>{label}</Link>

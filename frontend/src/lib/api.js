@@ -116,6 +116,13 @@ export const aiAPI = {
   searchVenueMaps: (query) => api.get('/ai/maps/search', { params: { query } }),
   getLogistics: (artistCity, venueCity) => api.get('/ai/maps/logistics', { params: { artistCity, venueCity } }),
   getReelInfo: (data) => api.post('/ai/media/reel-info', data),
+  // New AI Ecosystem endpoints
+  talentRating: (data) => api.post('/ai/talent-rating', data),
+  audienceAnalytics: (artistId) => api.get(`/ai/audience-analytics/${artistId}`),
+  predictEvent: (data) => api.post('/ai/predict-event', data),
+  generatePoster: (data) => api.post('/ai/generate-poster', data),
+  socialContent: (data) => api.post('/ai/social-content', data),
+  subscriptionPlans: () => api.get('/ai/subscription-plans'),
 };
 
 // ── Favorites & Notifications ──────────────────────────────

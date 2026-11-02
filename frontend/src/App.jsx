@@ -15,6 +15,11 @@ import ArtistDashboard from './pages/ArtistDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import LeaderboardPage from './pages/LeaderboardPage';
 import EventsBoardPage from './pages/EventsBoardPage';
+// AI Ecosystem Pages (New)
+import AIEcosystemPage from './pages/AIEcosystemPage';
+import AIPosterCreatorPage from './pages/AIPosterCreatorPage';
+import AISocialManagerPage from './pages/AISocialManagerPage';
+import ArtistPremiumPage from './pages/ArtistPremiumPage';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -93,6 +98,12 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* AI Ecosystem Routes (New) */}
+          <Route path="/ai-ecosystem" element={<AIEcosystemPage />} />
+          <Route path="/ai-poster" element={<AIPosterCreatorPage />} />
+          <Route path="/ai-social" element={<AISocialManagerPage />} />
+          <Route path="/premium" element={<ArtistPremiumPage />} />
 
           {/* Fallback & Catch-All */}
           <Route path="*" element={<Navigate to="/" replace />} />
