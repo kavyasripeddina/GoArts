@@ -7,7 +7,7 @@ import {
   TrendingUp, Award, Layers, Clock, LogOut, Check, ArrowUpRight,
   Sparkles, Activity, PieChart, Star, MapPin, ArrowRight, Sun, Moon,
   User, Lock, Key, Server, Database, ShieldCheck, CheckCircle2, ChevronRight,
-  ExternalLink, FileText, Globe, CreditCard, Building2, HelpCircle, CheckSquare, MessageSquare
+  ExternalLink, FileText, Globe, CreditCard, Building2, HelpCircle, CheckSquare, MessageSquare, Crown
 } from 'lucide-react';
 import { Navbar, Spinner, StatusBadge, formatINR, formatDate, EmptyState } from '../components/shared';
 import { adminAPI, authAPI } from '../lib/api';
@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 const TABS = [
   { id: 'overview', label: 'Executive Analytics', icon: BarChart2 },
   { id: 'verifications', label: 'Artist Verification Queue', icon: ShieldCheck },
+  { id: 'memberships', label: 'Memberships & Revenue', icon: Crown },
   { id: 'artists', label: 'Talent Management', icon: Award },
   { id: 'bookings', label: 'Booking Ledger', icon: Calendar },
   { id: 'customers', label: 'Client Accounts', icon: Users },
@@ -623,6 +624,17 @@ export default function AdminDashboard() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  // Memberships & Subscriptions state
+  const [memberships, setMemberships] = useState([]);
+  const [membershipMetrics, setMembershipMetrics] = useState(null);
+  const [loadingMemberships, setLoadingMemberships] = useState(false);
+  const [membershipFilter, setMembershipFilter] = useState('all');
+  const [membershipSearch, setMembershipSearch] = useState('');
+  const [selectedMembershipForReview, setSelectedMembershipForReview] = useState(null);
+  const [membershipDecisionStatus, setMembershipDecisionStatus] = useState('active');
+  const [membershipReviewNotes, setMembershipReviewNotes] = useState('');
+  const [submittingMembershipReview, setSubmittingMembershipReview] = useState(false);
+
   // Synchronize activeTab with URL search params when changed from navbar
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
@@ -730,6 +742,19 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchMemberships = useCallback(async () => {
+    setLoadingMemberships(true);
+    try {
+      const { data } = await adminAPI.memberships();
+      setMemberships(data.memberships || []);
+      setMembershipMetrics(data.metrics || null);
+    } catch {
+      toast.error('Failed to load membership subscriptions.');
+    } finally {
+      setLoadingMemberships(false);
+    }
+  }, []);
+
   const fetchVerifications = useCallback(async (filterToFetch = verifFilter, trackToFetch = verifTrackFilter) => {
     setLoadingVerifications(true);
     try {
@@ -752,11 +777,12 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeTab === 'verifications') fetchVerifications(verifFilter);
+    else if (activeTab === 'memberships') fetchMemberships();
     else if (activeTab === 'artists') fetchArtists();
     else if (activeTab === 'bookings') fetchBookings();
     else if (activeTab === 'customers') fetchCustomers();
     else if (activeTab === 'logs') fetchAuditLogs();
-  }, [activeTab, verifFilter, fetchVerifications, fetchArtists, fetchBookings, fetchCustomers, fetchAuditLogs]);
+  }, [activeTab, verifFilter, fetchVerifications, fetchMemberships, fetchArtists, fetchBookings, fetchCustomers, fetchAuditLogs]);
 
   // ── Actions ───────────────────────────────────────────────────
   const handleAuditDecisionSubmit = async () => {
@@ -809,6 +835,31 @@ export default function AdminDashboard() {
       toast.error(err.response?.data?.error || 'Failed to update governance settings.');
     } finally {
       setSavingGovernance(false);
+    }
+  };
+
+  const handleMembershipReviewSubmit = async () => {
+    if (!selectedMembershipForReview) return;
+    setSubmittingMembershipReview(true);
+    try {
+      await adminAPI.reviewMembership(selectedMembershipForReview.id, {
+        status: membershipDecisionStatus,
+        adminNotes: membershipReviewNotes,
+      });
+      toast.success(
+        membershipDecisionStatus === 'active'
+          ? `✓ Membership successfully activated for ${selectedMembershipForReview.userName}! Tier privileges unlocked.`
+          : '✕ Membership application rejected.'
+      );
+      setSelectedMembershipForReview(null);
+      setMembershipReviewNotes('');
+      fetchMemberships();
+      fetchOverview();
+      fetchAuditLogs();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to process membership review.');
+    } finally {
+      setSubmittingMembershipReview(false);
     }
   };
 
@@ -1969,6 +2020,336 @@ export default function AdminDashboard() {
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: MEMBERSHIPS & REVENUE GOVERNANCE */}
+          {activeTab === 'memberships' && (
+            <div style={{ animation: 'fadeIn 0.25s ease' }}>
+              {/* Header Title */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Crown size={26} color="#f59e0b" /> Memberships & Subscription Governance
+                  </h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                    Verify payment transaction proofs (UPI/Card/NetBanking/Escrow) and unlock tier privileges for Elite, Pro, and Basic members in real time.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={fetchMemberships}
+                  disabled={loadingMemberships}
+                  className="btn btn-outline btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                >
+                  <RefreshCw size={14} className={loadingMemberships ? 'spin' : ''} /> Refresh Ledger
+                </button>
+              </div>
+
+              {/* KPI Cards Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+                <div style={{ background: 'var(--color-card)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '16px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#10b981', textTransform: 'uppercase', fontWeight: 800 }}>Monthly Recurring Revenue</span>
+                  <div style={{ fontSize: '1.85rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
+                    {formatINR(membershipMetrics?.mrr || 0)}
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>From active verified subscriptions</span>
+                </div>
+
+                <div style={{ background: 'var(--color-card)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '16px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', textTransform: 'uppercase', fontWeight: 800 }}>Pending Review</span>
+                  <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#f59e0b', marginTop: '0.25rem' }}>
+                    {membershipMetrics?.pending || 0}
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Awaiting admin payment verification</span>
+                </div>
+
+                <div style={{ background: 'var(--color-card)', border: '1px solid rgba(66,133,244,0.3)', borderRadius: '16px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#4285F4', textTransform: 'uppercase', fontWeight: 800 }}>Active Members</span>
+                  <div style={{ fontSize: '1.85rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: '0.25rem' }}>
+                    {membershipMetrics?.active || 0}
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Current active subscriptions</span>
+                </div>
+
+                <div style={{ background: 'var(--color-card)', border: '1px solid rgba(188,70,57,0.3)', borderRadius: '16px', padding: '1.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#BC4639', textTransform: 'uppercase', fontWeight: 800 }}>👑 Elite Tier VIPs</span>
+                  <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#BC4639', marginTop: '0.25rem' }}>
+                    {membershipMetrics?.elite || 0}
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Full AI Growth suite unlocked</span>
+                </div>
+              </div>
+
+              {/* Filter and Search Bar */}
+              <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '1rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'all', label: 'All Subscriptions' },
+                    { id: 'pending', label: `Pending Review (${memberships.filter(m => m.status === 'pending').length})` },
+                    { id: 'active', label: `Active (${memberships.filter(m => m.status === 'active').length})` },
+                    { id: 'rejected', label: `Rejected (${memberships.filter(m => m.status === 'rejected').length})` },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setMembershipFilter(f.id)}
+                      style={{
+                        padding: '0.45rem 0.9rem',
+                        borderRadius: '20px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: membershipFilter === f.id ? 700 : 500,
+                        background: membershipFilter === f.id ? '#4285F4' : 'var(--color-surface)',
+                        color: membershipFilter === f.id ? '#ffffff' : 'var(--text-secondary)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ position: 'relative', minWidth: '240px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search by member, email, or UTR..."
+                    value={membershipSearch}
+                    onChange={(e) => setMembershipSearch(e.target.value)}
+                    style={{
+                      paddingLeft: '2.2rem',
+                      paddingRight: '0.75rem',
+                      paddingTop: '0.45rem',
+                      paddingBottom: '0.45rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-surface)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem',
+                      width: '100%',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Subscriptions List */}
+              {loadingMemberships ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
+                  <Spinner size="lg" />
+                </div>
+              ) : (() => {
+                const filtered = memberships.filter((m) => {
+                  if (membershipFilter !== 'all' && m.status !== membershipFilter) return false;
+                  if (membershipSearch.trim()) {
+                    const q = membershipSearch.toLowerCase();
+                    const matchUser = (m.userName || '').toLowerCase().includes(q);
+                    const matchEmail = (m.userEmail || '').toLowerCase().includes(q);
+                    const matchRef = (m.transactionRef || '').toLowerCase().includes(q);
+                    const matchPlan = (m.planName || '').toLowerCase().includes(q);
+                    if (!matchUser && !matchEmail && !matchRef && !matchPlan) return false;
+                  }
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <EmptyState
+                      icon={Crown}
+                      title="No Membership Applications Found"
+                      description="No subscription records match your selected filter criteria. When users subscribe, their payment proofs will appear here for verification."
+                    />
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {filtered.map((m) => {
+                      const isPending = m.status === 'pending';
+                      const isActive = m.status === 'active';
+                      const isRejected = m.status === 'rejected';
+
+                      const planBadgeColor = 
+                        m.planId === 'elite' ? { bg: 'rgba(188,70,57,0.12)', text: '#BC4639', border: '#BC4639' } :
+                        m.planId === 'pro' ? { bg: 'rgba(66,133,244,0.12)', text: '#4285F4', border: '#4285F4' } :
+                        { bg: 'rgba(16,185,129,0.12)', text: '#10b981', border: '#10b981' };
+
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            background: 'var(--color-card)',
+                            border: `1px solid ${isPending ? 'rgba(245,158,11,0.5)' : 'var(--color-border)'}`,
+                            borderRadius: '16px',
+                            padding: '1.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            transition: 'border-color 0.2s ease',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                            {/* Member Details */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '12px',
+                                background: 'linear-gradient(135deg, #4285F4, #BC4639)',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '1.1rem'
+                              }}>
+                                {(m.userName || 'M').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                                    {m.userName || 'Member'}
+                                  </h3>
+                                  <span style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    padding: '0.2rem 0.5rem',
+                                    borderRadius: '6px',
+                                    textTransform: 'uppercase',
+                                    background: m.userRole === 'artist' ? 'rgba(66,133,244,0.12)' : 'rgba(16,185,129,0.12)',
+                                    color: m.userRole === 'artist' ? '#4285F4' : '#10b981',
+                                  }}>
+                                    {m.userRole || 'customer'}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                                  {m.userEmail} · Requested: {formatDate(m.requestedAt || m.createdAt)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Plan and Status Badges */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                              <span style={{
+                                background: planBadgeColor.bg,
+                                color: planBadgeColor.text,
+                                border: `1px solid ${planBadgeColor.border}`,
+                                borderRadius: '10px',
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 800,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                              }}>
+                                {m.planId === 'elite' && '👑'} {m.planName} · {formatINR(m.amount)}/mo
+                              </span>
+
+                              <span style={{
+                                background: isActive ? 'rgba(16,185,129,0.15)' : isPending ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: isActive ? '#10b981' : isPending ? '#f59e0b' : '#ef4444',
+                                borderRadius: '10px',
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 800,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                              }}>
+                                {isActive && <CheckCircle size={14} />}
+                                {isPending && <Clock size={14} />}
+                                {isRejected && <XCircle size={14} />}
+                                {isActive ? 'Active Member' : isPending ? 'Pending Payment Review' : 'Rejected'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Payment Evidence Bar */}
+                          <div style={{
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '12px',
+                            padding: '0.85rem 1rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '1rem',
+                            fontSize: '0.85rem',
+                          }}>
+                            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>Payment Method</span>
+                                <strong style={{ color: 'var(--text-primary)', textTransform: 'uppercase' }}>
+                                  💳 {m.paymentMethod || 'UPI / QR'}
+                                </strong>
+                              </div>
+
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>Transaction Reference / UTR</span>
+                                <code style={{
+                                  background: 'var(--color-card)',
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '6px',
+                                  color: '#4285F4',
+                                  fontWeight: 700,
+                                  fontFamily: 'monospace'
+                                }}>
+                                  {m.transactionRef || 'NO_REF_PROVIDED'}
+                                </code>
+                              </div>
+
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>Billing Cycle</span>
+                                <strong style={{ color: 'var(--text-primary)' }}>Monthly Recurring</strong>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMembershipForReview(m);
+                                  setMembershipDecisionStatus(m.status === 'active' ? 'active' : 'active');
+                                  setMembershipReviewNotes(m.adminNotes || '');
+                                }}
+                                className="btn btn-primary btn-sm"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                              >
+                                <ShieldCheck size={14} /> Review & Manage Access
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Admin Notes / Review Timestamp */}
+                          {m.adminNotes && (
+                            <div style={{
+                              background: 'rgba(66,133,244,0.06)',
+                              borderLeft: '3px solid #4285F4',
+                              borderRadius: '6px',
+                              padding: '0.5rem 0.75rem',
+                              fontSize: '0.8rem',
+                              color: 'var(--text-secondary)'
+                            }}>
+                              <strong style={{ color: 'var(--text-primary)' }}>Admin Remarks: </strong>
+                              {m.adminNotes}
+                              {m.reviewedAt && (
+                                <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                  (Reviewed: {formatDate(m.reviewedAt)})
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -3412,6 +3793,185 @@ export default function AdminDashboard() {
                       Close
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL 5: MEMBERSHIP APPLICATION REVIEW & DECISION INSPECTOR ────── */}
+          {selectedMembershipForReview && (
+            <div style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.72)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2350,
+              padding: '1rem',
+            }}>
+              <div style={{
+                background: 'var(--color-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '24px',
+                maxWidth: '650px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                boxShadow: 'var(--shadow-lg)',
+                padding: '2rem',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ background: '#f59e0b', borderRadius: '12px', padding: '0.5rem', display: 'flex' }}>
+                      <Crown size={22} color="white" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                        Review Membership Payment
+                      </h3>
+                      <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Evaluating subscription for {selectedMembershipForReview.userName}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedMembershipForReview(null)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.4rem' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Subscription Details summary */}
+                <div style={{ background: 'var(--color-surface)', borderRadius: '14px', padding: '1.25rem', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', border: '1px solid var(--color-border)' }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Member</span>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{selectedMembershipForReview.userName}</strong>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{selectedMembershipForReview.userEmail}</div>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Applied Plan & Price</span>
+                    <strong style={{ color: '#4285F4', fontSize: '0.95rem' }}>{selectedMembershipForReview.planName}</strong>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {formatINR(selectedMembershipForReview.amount)} / month
+                    </div>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Payment Method</span>
+                    <strong style={{ color: 'var(--text-primary)', textTransform: 'uppercase' }}>
+                      💳 {selectedMembershipForReview.paymentMethod || 'UPI'}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>UTR / Transaction Reference</span>
+                    <code style={{ background: 'var(--color-card)', padding: '0.2rem 0.5rem', borderRadius: '6px', color: '#10b981', fontWeight: 700, fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                      {selectedMembershipForReview.transactionRef || 'NO_REF_PROVIDED'}
+                    </code>
+                  </div>
+                </div>
+
+                {/* Decision Selector */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label className="form-label" style={{ fontWeight: 800, marginBottom: '0.5rem', display: 'block' }}>
+                    Admin Verification Decision
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setMembershipDecisionStatus('active')}
+                      style={{
+                        padding: '1rem',
+                        borderRadius: '12px',
+                        border: `2px solid ${membershipDecisionStatus === 'active' ? '#10b981' : 'var(--color-border)'}`,
+                        background: membershipDecisionStatus === 'active' ? 'rgba(16,185,129,0.1)' : 'var(--color-surface)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: '#10b981', marginBottom: '0.25rem' }}>
+                        <CheckCircle size={18} /> Approve & Activate Access
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        Confirm payment receipt. Immediately unlocks {selectedMembershipForReview.planName} features.
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMembershipDecisionStatus('rejected')}
+                      style={{
+                        padding: '1rem',
+                        borderRadius: '12px',
+                        border: `2px solid ${membershipDecisionStatus === 'rejected' ? '#ef4444' : 'var(--color-border)'}`,
+                        background: membershipDecisionStatus === 'rejected' ? 'rgba(239,68,68,0.1)' : 'var(--color-surface)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: '#ef4444', marginBottom: '0.25rem' }}>
+                        <XCircle size={18} /> Reject Application
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        Decline payment proof. Access remains on previous free tier.
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Admin Notes */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label className="form-label" style={{ fontWeight: 800, marginBottom: '0.5rem', display: 'block' }}>
+                    Verification Remarks / Notes for Audit
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="form-input"
+                    placeholder="e.g. Verified ₹9,999 UTR transaction credit in HDFC Escrow account. All AI Growth features activated."
+                    value={membershipReviewNotes}
+                    onChange={(e) => setMembershipReviewNotes(e.target.value)}
+                    style={{ width: '100%', resize: 'vertical' }}
+                  />
+                </div>
+
+                {/* Footer Buttons */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMembershipForReview(null)}
+                    className="btn btn-outline"
+                    disabled={submittingMembershipReview}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleMembershipReviewSubmit}
+                    disabled={submittingMembershipReview}
+                    className={`btn ${membershipDecisionStatus === 'active' ? 'btn-primary' : 'btn-danger'}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontWeight: 800,
+                      background: membershipDecisionStatus === 'active' ? '#10b981' : '#ef4444',
+                      borderColor: membershipDecisionStatus === 'active' ? '#10b981' : '#ef4444',
+                    }}
+                  >
+                    {submittingMembershipReview ? (
+                      <><RefreshCw size={16} className="spin" /> Updating Access...</>
+                    ) : membershipDecisionStatus === 'active' ? (
+                      <><CheckCircle size={16} /> Confirm & Activate Subscription</>
+                    ) : (
+                      <><XCircle size={16} /> Confirm Rejection</>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

@@ -116,6 +116,7 @@ router.post('/register', async (req, res) => {
       category,
       avatar,
       artistTier,
+      startingPrice,
       officialLinks,
       achievements,
       portfolioDocs,
@@ -233,6 +234,11 @@ router.post('/register', async (req, res) => {
             portfolioReels: portfolioDocs || [],
           };
 
+      const parsedStartingPrice = Number(startingPrice);
+      const finalStartingPrice = !isNaN(parsedStartingPrice) && parsedStartingPrice > 0
+        ? parsedStartingPrice
+        : (isClaimingEstablished ? 250000 : 30000);
+
       const artistProfile = {
         id: newId(),
         userId,
@@ -248,7 +254,7 @@ router.post('/register', async (req, res) => {
         genres: ['Live Music', 'Fusion', 'Acoustic'],
         languages: ['Telugu', 'Hindi', 'English'],
         city: user.city,
-        startingPrice: isClaimingEstablished ? 250000 : 30000,
+        startingPrice: finalStartingPrice,
         rating: 0,
         reviewCount: 0,
         image: artistImg,

@@ -1,7 +1,8 @@
 // GoArts AI - AI Matching & Event Planning Routes (Azure Cloud + Gemini Powered)
 import express from 'express';
-import { db } from '../db/inMemoryDb.js';
+import { db, newId, now, saveItem, updateById } from '../db/inMemoryDb.js';
 import { isMongoConnected } from '../db/mongo.js';
+import { authenticate } from '../middleware/auth.js';
 import { planEventWithGemini, chatWithGemini } from '../services/geminiService.js';
 import {
   planEventWithAzureOpenAI,
@@ -636,22 +637,73 @@ router.get('/audience-analytics/:artistId', (req, res) => {
   const reviews = db.reviews.filter(r => r.artistId === artist.id && r.isPublished);
   const completed = bookings.filter(b => b.status === 'completed');
 
-  // Aggregate event types or provide rich industry defaults
+  // Check if this artist has genuine booking or historical performance data
+  const realCompletedCount = completed.length > 0 ? completed.length : (artist.completedBookings || 0);
+  const realTotalBookings = bookings.length > 0 ? bookings.length : (artist.totalBookings || 0);
+
+  // If a newly created artist account has 0 completed shows, return honest, genuine zeroed telemetry
+  if (realCompletedCount === 0 && realTotalBookings === 0) {
+    const now = new Date();
+    const zeroMonthlyTrend = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      zeroMonthlyTrend.push({ month: label, bookings: 0, attendance: 0 });
+    }
+
+    return res.json({
+      artistId: artist.id,
+      artistName,
+      artistImage: artist.image || artist.avatar || artist.images?.[0] || '',
+      category: artist.category || 'Performer',
+      city: artist.city || 'Hyderabad',
+      artistTier: artist.artistTier || 'emerging',
+      startingPrice: artist.startingPrice || 25000,
+      analytics: {
+        totalBookings: 0,
+        completedShows: 0,
+        averageRating: reviews.length > 0 ? artist.rating : 0,
+        totalReviews: reviews.length,
+        engagementRate: 0,
+        estimatedAvgAudienceSize: 0,
+        peakAudienceRecorded: 0,
+        repeatClientRate: 0,
+        venueFillRate: '0%',
+        topEventTypes: [],
+        topCities: [],
+        monthlyTrend: zeroMonthlyTrend,
+        popularSongs: [],
+        crowdReactions: {
+          enthusiastic: 0,
+          joyful: 0,
+          neutral: 0,
+          sentimentLabel: 'New Performer — No live telemetry recorded yet. Completing your first event gig will automatically activate crowd analytics.',
+          encoreFrequency: 'N/A',
+          standingOvations: 'N/A',
+        },
+      },
+      insights: [
+        `${artistName} registered as an independent ${artist.category || 'artist'} with starting rate ₹${(artist.startingPrice || 25000).toLocaleString('en-IN')}.`,
+        'Zero completed performances recorded yet. GoArts enforces 100% authentic ratings — only verified clients who complete a booking can leave reviews.',
+        'Pitch for gigs on the Open Gigs Board or share your profile link with clients to land your first confirmed show!',
+      ],
+      source: 'goarts-authentic-audience-telemetry',
+    });
+  }
+
+  // Aggregate event types from genuine bookings
   const eventTypeCounts = {};
   bookings.forEach(b => {
     const et = b.eventType || 'Other';
     eventTypeCounts[et] = (eventTypeCounts[et] || 0) + 1;
   });
 
-  const defaultEventTypes = (artist.eventTypes && artist.eventTypes.length > 0)
-    ? artist.eventTypes
-    : ['Wedding Reception', 'College Festival', 'Corporate Gala', 'Music Concert'];
-
-  defaultEventTypes.forEach((et, idx) => {
-    if (!eventTypeCounts[et]) {
-      eventTypeCounts[et] = Math.max(1, Math.round((artist.totalBookings || 12) * (0.4 - idx * 0.08)));
-    }
-  });
+  // If seeded artist without individual booking objects, use their genuine configured eventTypes
+  if (Object.keys(eventTypeCounts).length === 0 && artist.eventTypes?.length) {
+    artist.eventTypes.forEach((et, idx) => {
+      eventTypeCounts[et] = Math.max(1, Math.round(realTotalBookings * (0.5 - idx * 0.1)));
+    });
+  }
 
   // Aggregate cities
   const cityCounts = {};
@@ -660,17 +712,13 @@ router.get('/audience-analytics/:artistId', (req, res) => {
     cityCounts[city] = (cityCounts[city] || 0) + 1;
   });
 
-  const defaultCities = [artist.city || 'Hyderabad', 'Bengaluru', 'Mumbai', 'Chennai', 'Delhi'];
-  defaultCities.forEach((c, idx) => {
-    if (!cityCounts[c]) {
-      cityCounts[c] = Math.max(1, Math.round((artist.totalBookings || 10) * (0.35 - idx * 0.06)));
-    }
-  });
+  if (Object.keys(cityCounts).length === 0 && artist.city) {
+    cityCounts[artist.city] = realTotalBookings;
+  }
 
   // Monthly booking trend (last 6 months)
   const now = new Date();
   const monthlyTrend = [];
-  const baseBookingVolume = Math.max(3, Math.round((artist.totalBookings || 15) / 5));
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
@@ -678,13 +726,12 @@ router.get('/audience-analytics/:artistId', (req, res) => {
       const bd = new Date(b.createdAt);
       return bd.getFullYear() === d.getFullYear() && bd.getMonth() === d.getMonth();
     }).length;
-    // Blend real bookings with baseline volume for realistic visualization
-    const count = realCount > 0 ? realCount : Math.max(1, Math.round(baseBookingVolume * (0.8 + ((i * 3) % 4) * 0.15)));
+    const count = realCount > 0 ? realCount : (i === 0 ? Math.min(realTotalBookings, 2) : 0);
     const attendance = count * (artist.artistTier === 'established' ? 3500 : 450);
     monthlyTrend.push({ month: label, bookings: count, attendance });
   }
 
-  // Popular songs / Setlist catalog
+  // Category Songs / Setlist
   const categorySongs = {
     Singer: [
       { title: 'Live Vocals & Chartbuster Medley', requests: 482, energy: '98%', reaction: '🔥 Standing Ovation' },
@@ -710,15 +757,12 @@ router.get('/audience-analytics/:artistId', (req, res) => {
       { title: 'Bollywood Group Finale & Props', requests: 340, energy: '98%', reaction: '🎉 Whistles & Cheering' },
     ],
   };
-
   const songsList = categorySongs[artist.category] || categorySongs.Singer;
 
-  // Engagement & Attendance calculations
   const isEstablished = artist.artistTier === 'established';
-  const totalShows = Math.max(bookings.length, artist.completedBookings || artist.totalBookings || 18);
   const avgAudienceSize = isEstablished ? 4500 : 650;
-  const engagementRate = Math.min(99, Math.round(88 + (artist.rating || 4.8) * 2 + (reviews.length > 0 ? 2 : 0)));
-  const repeatClientRate = Math.min(94, Math.round(35 + (artist.rating >= 4.8 ? 25 : 15)));
+  const engagementRate = Math.min(99, Math.round(85 + (artist.rating || 4.5) * 2));
+  const repeatClientRate = Math.min(94, Math.round(30 + (artist.rating >= 4.8 ? 25 : 10)));
 
   res.json({
     artistId: artist.id,
@@ -727,11 +771,12 @@ router.get('/audience-analytics/:artistId', (req, res) => {
     category: artist.category || 'Performer',
     city: artist.city || 'Hyderabad',
     artistTier: artist.artistTier || 'emerging',
+    startingPrice: artist.startingPrice || 25000,
     analytics: {
-      totalBookings: totalShows,
-      completedShows: Math.max(completed.length, Math.round(totalShows * 0.9)),
-      averageRating: artist.rating || 4.9,
-      totalReviews: reviews.length || artist.reviewCount || 42,
+      totalBookings: realTotalBookings,
+      completedShows: realCompletedCount,
+      averageRating: artist.rating || 0,
+      totalReviews: reviews.length || artist.reviewCount || 0,
       engagementRate,
       estimatedAvgAudienceSize: avgAudienceSize,
       peakAudienceRecorded: isEstablished ? 25000 : 3500,
@@ -1014,6 +1059,182 @@ router.get('/subscription-plans', (req, res) => {
       { name: 'Sponsorship Revenue', description: 'Corporate-sponsored festivals, concerts, and cultural events', icon: '🏆' },
     ],
     source: 'goarts-pricing-engine',
+  });
+});
+
+// ── AI Video Reel Generator (Promotional Videos Automatically) ──
+router.post('/video-reel/generate', async (req, res) => {
+  const {
+    artistName = 'Featured Performer',
+    eventTitle = 'Live in Concert',
+    genre = 'Live Music',
+    vibe = 'Energetic Concert',
+    targetDuration = 30, // seconds
+    audioTrack = 'Upbeat Electronic & Acoustic Drop',
+  } = req.body;
+
+  // Storyboard and shot breakdown
+  const storyboard = [
+    {
+      scene: 1,
+      timestamp: '00:00 - 00:04',
+      name: 'Dynamic Hook & Artist Title Card',
+      cameraMovement: 'Fast zoom-in with neon cinematic light streak',
+      visualAction: `High-contrast silhouette portrait of ${artistName} transitioning into high-energy stage spotlight.`,
+      overlayText: `🔥 ${artistName.toUpperCase()} — LIVE EXPERIENCE`,
+      audioCue: 'Heavy sub-bass riser & vocal snippet',
+    },
+    {
+      scene: 2,
+      timestamp: '00:04 - 00:14',
+      name: 'Performance Climax & Solo Drop',
+      cameraMovement: 'Circular tracking shot around performer / DJ deck',
+      visualAction: `Rapid-fire montage of guitar solo, drum fills, or vocal high-note with pyro effects and confetti cannons.`,
+      overlayText: `⚡ UNSTOPPABLE STAGE POWER · ${genre.toUpperCase()}`,
+      audioCue: 'Full beat drop & maximum crowd reverb',
+    },
+    {
+      scene: 3,
+      timestamp: '00:14 - 00:24',
+      name: 'Crowd Reaction & Euphoria',
+      cameraMovement: 'Sweeping wide crane shot from audience view',
+      visualAction: 'Thousands of fans with phone flashlights raised, jumping in sync, singing along with standing ovation.',
+      overlayText: '🌟 98% AUDIENCE SATISFACTION GUARANTEED',
+      audioCue: 'Cheering roar blended with driving synth harmony',
+    },
+    {
+      scene: 4,
+      timestamp: '00:24 - 00:30',
+      name: 'Closing CTA & Booking Information',
+      cameraMovement: 'Smooth pull-back into branded card',
+      visualAction: 'GoArts AI Verified Badge emblem stamp with official booking link and event calendar.',
+      overlayText: `🎟️ BOOK NOW ON GOARTS.AI · ESCROW PROTECTED`,
+      audioCue: 'Fade out on signature audio logo chord',
+    },
+  ];
+
+  res.json({
+    success: true,
+    reel: {
+      id: newId(),
+      title: `${artistName} — ${eventTitle} (Official Promo Reel)`,
+      artistName,
+      genre,
+      vibe,
+      duration: `${targetDuration}s`,
+      aspectRatio: '9:16 (Vertical HD 1080x1920)',
+      targetPlatforms: ['Instagram Reels', 'YouTube Shorts', 'TikTok', 'WhatsApp Status'],
+      storyboard,
+      audioSpecs: {
+        track: audioTrack,
+        bpm: 128,
+        syncPoints: ['00:04 (Drop)', '00:14 (Chorus)', '00:24 (Outro)'],
+      },
+      exportSettings: {
+        codec: 'H.264 / AAC',
+        bitrate: '15 Mbps',
+        resolution: '1080 x 1920 (Full HD)',
+        frameRate: '60 FPS',
+      },
+      previewVideoUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80',
+    },
+    source: 'goarts-video-reel-engine',
+  });
+});
+
+// ── Memberships: Request Subscription (Artist or Customer) ──
+router.post('/memberships/request', authenticate, async (req, res) => {
+  const { planId = 'elite', paymentMethod = 'UPI', transactionRef, note = '' } = req.body;
+
+  if (!['basic', 'pro', 'elite'].includes(planId)) {
+    return res.status(400).json({ error: 'Invalid plan selected. Choose basic, pro, or elite.' });
+  }
+
+  const planPricing = { basic: 999, pro: 2999, elite: 9999 };
+  const planNames = { basic: 'Basic', pro: 'Pro', elite: 'Elite' };
+
+  const user = db.users.find((u) => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const artist = db.artists.find((a) => a.userId === user.id);
+
+  const membership = {
+    id: newId(),
+    userId: user.id,
+    userName: user.name,
+    userEmail: user.email,
+    userRole: user.role,
+    artistId: artist?.id || null,
+    planId,
+    planName: planNames[planId],
+    amount: planPricing[planId],
+    billingCycle: 'month',
+    paymentMethod,
+    transactionRef: transactionRef ? String(transactionRef).trim() : `TXN-${Date.now().toString(36).toUpperCase()}`,
+    status: 'pending',
+    note,
+    adminNotes: '',
+    requestedAt: now(),
+    activatedAt: null,
+    expiresAt: null,
+    createdAt: now(),
+  };
+
+  await saveItem('memberships', membership);
+
+  // Mark pending in user record
+  user.pendingMembershipPlan = planId;
+  await updateById('users', user.id, user);
+
+  // Send notification to Admin team
+  const admins = db.users.filter((u) => u.role === 'admin');
+  for (const admin of admins) {
+    db.notifications.push({
+      id: newId(),
+      userId: admin.id,
+      type: 'membership_requested',
+      message: `👑 New Membership Request: "${user.name}" (${user.role}) applied for ${planNames[planId]} Plan (₹${planPricing[planId]}/mo) via ${paymentMethod} (Ref: ${membership.transactionRef}). Awaiting Admin verification.`,
+      isRead: false,
+      createdAt: now(),
+    });
+  }
+
+  // Send confirmation to User
+  db.notifications.push({
+    id: newId(),
+    userId: user.id,
+    type: 'membership_pending',
+    message: `📋 Membership Request Submitted: Your application for ${planNames[planId]} Plan (₹${planPricing[planId]}/mo) via ${paymentMethod} has been sent to GoArts Trust & Safety Admin for payment verification.`,
+    isRead: false,
+    createdAt: now(),
+  });
+
+  res.status(201).json({
+    success: true,
+    message: `Your ${planNames[planId]} plan request has been submitted to Admin. Your access will be activated upon verification of your payment.`,
+    membership,
+  });
+});
+
+// ── Memberships: Get My Current Membership Status ──────────
+router.get('/memberships/my', authenticate, (req, res) => {
+  const user = db.users.find((u) => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  const memberships = (db.memberships || [])
+    .filter((m) => m.userId === user.id)
+    .sort((a, b) => new Date(b.requestedAt || b.createdAt) - new Date(a.requestedAt || a.createdAt));
+
+  const active = memberships.find((m) => m.status === 'active');
+  const pending = memberships.find((m) => m.status === 'pending');
+
+  res.json({
+    currentPlan: active?.planId || user.subscriptionTier || 'free',
+    isElite: (active?.planId || user.subscriptionTier) === 'elite' || user.role === 'admin',
+    isPro: ['pro', 'elite'].includes(active?.planId || user.subscriptionTier) || user.role === 'admin',
+    activeMembership: active || null,
+    pendingMembership: pending || null,
+    history: memberships,
   });
 });
 

@@ -87,6 +87,7 @@ const COLLECTION_NAMES = [
   'messages',
   'payments',
   'verifications',
+  'memberships',
 ];
 
 // ============================================================

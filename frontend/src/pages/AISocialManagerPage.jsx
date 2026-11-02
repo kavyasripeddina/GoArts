@@ -1,8 +1,10 @@
 // GoArts AI Social Media Manager
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Navbar, Footer } from '../components/shared';
 import { aiAPI } from '../lib/api';
-import { Share2, Loader2, Copy, Check, Calendar } from 'lucide-react';
+import { useAuth } from '../context/useAuth';
+import { Share2, Loader2, Copy, Check, Calendar, Crown, Lock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const PLATFORMS = [
@@ -23,13 +25,37 @@ function CopyButton({ text }) {
 }
 
 export default function AISocialManagerPage() {
+  const { user } = useAuth();
   const [form, setForm] = useState({ artistName: '', eventName: '', eventDate: '', venue: '', platform: 'instagram', tone: 'exciting', genre: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeP, setActiveP] = useState('instagram');
+  const [membershipStatus, setMembershipStatus] = useState(null);
+  const [loadingMembership, setLoadingMembership] = useState(true);
+
+  useEffect(() => {
+    const fetchMembership = async () => {
+      try {
+        const { data } = await aiAPI.myMembership();
+        setMembershipStatus(data);
+      } catch (e) {
+        console.error('Membership fetch error:', e);
+      } finally {
+        setLoadingMembership(false);
+      }
+    };
+    if (user) fetchMembership();
+    else setLoadingMembership(false);
+  }, [user]);
+
+  const isElite = membershipStatus?.isElite || user?.role === 'admin';
 
   const handleGenerate = async (e) => {
     e.preventDefault();
+    if (!isElite && !loadingMembership) {
+      toast.error('AI Social Media Manager is an exclusive Elite Plan feature.');
+      return;
+    }
     if (!form.artistName && !form.eventName) { toast.error('Please enter artist name or event name.'); return; }
     setLoading(true);
     try {
@@ -63,6 +89,28 @@ export default function AISocialManagerPage() {
         </div>
 
         <div className="container" style={{ padding: '2rem 1rem' }}>
+          {/* Paywall Banner for non-Elite users */}
+          {!loadingMembership && !isElite && (
+            <div style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(66,133,244,0.12))', border: '2px solid rgba(245,158,11,0.4)', borderRadius: '20px', padding: '1.75rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ background: '#f59e0b', borderRadius: '14px', padding: '0.75rem', display: 'flex' }}>
+                  <Crown size={26} color="white" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.2rem' }}>
+                    Elite Tier Feature — AI Social Media Manager
+                  </h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>
+                    Automated multi-platform campaigns, hashtag suggestions, and posting calendars are unlocked with Elite Plan (₹9,999/month).
+                  </p>
+                </div>
+              </div>
+              <Link to="/premium" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
+                Upgrade to Elite <ArrowRight size={16} />
+              </Link>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(300px, 1.5fr)', gap: '2rem', alignItems: 'start' }}>
             {/* Form */}
             <form onSubmit={handleGenerate} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem' }}>
@@ -91,8 +139,25 @@ export default function AISocialManagerPage() {
                   <option value="cultural">🎭 Cultural & Traditional</option>
                 </select>
               </div>
-              <button type="submit" className="btn btn-primary btn-full" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                {loading ? <><Loader2 size={16} className="spin" /> Generating...</> : <><Share2 size={16} /> Generate Content</>}
+              <button 
+                type="submit" 
+                className="btn btn-primary btn-full" 
+                disabled={loading || (!isElite && !loadingMembership)} 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '0.5rem',
+                  opacity: (!isElite && !loadingMembership) ? 0.6 : 1
+                }}
+              >
+                {loading ? (
+                  <><Loader2 size={16} className="spin" /> Generating...</>
+                ) : !isElite && !loadingMembership ? (
+                  <><Lock size={16} /> Unlock with Elite Membership</>
+                ) : (
+                  <><Share2 size={16} /> Generate Content</>
+                )}
               </button>
             </form>
 

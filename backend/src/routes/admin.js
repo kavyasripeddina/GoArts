@@ -991,4 +991,109 @@ router.get('/revenue', (req, res) => {
   res.json({ revenueByCategory, revenueByCity, topArtists });
 });
 
+// ── Memberships & Subscriptions Management ─────────────────
+router.get('/memberships', (req, res) => {
+  const memberships = (db.memberships || []).slice().sort((a, b) => new Date(b.requestedAt || b.createdAt) - new Date(a.requestedAt || a.createdAt));
+  const activeCount = memberships.filter((m) => m.status === 'active').length;
+  const pendingCount = memberships.filter((m) => m.status === 'pending').length;
+  const eliteCount = memberships.filter((m) => m.status === 'active' && m.planId === 'elite').length;
+  const mrr = memberships.filter((m) => m.status === 'active').reduce((sum, m) => sum + (m.amount || 0), 0);
+
+  res.json({
+    memberships,
+    metrics: {
+      total: memberships.length,
+      active: activeCount,
+      pending: pendingCount,
+      elite: eliteCount,
+      mrr,
+    },
+  });
+});
+
+router.put('/memberships/:id/review', async (req, res) => {
+  const { id } = req.params;
+  const { status, adminNotes = '' } = req.body; // 'active' or 'rejected'
+
+  if (!['active', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be active or rejected.' });
+  }
+
+  const membership = (db.memberships || []).find((m) => m.id === id);
+  if (!membership) {
+    return res.status(404).json({ error: 'Membership application not found.' });
+  }
+
+  membership.status = status;
+  membership.adminNotes = adminNotes;
+  membership.reviewedBy = req.user.id;
+  membership.reviewedAt = now();
+
+  const user = db.users.find((u) => u.id === membership.userId);
+
+  if (status === 'active') {
+    membership.activatedAt = now();
+    membership.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (user) {
+      user.subscriptionTier = membership.planId;
+      user.pendingMembershipPlan = null;
+      await updateById('users', user.id, user);
+    }
+
+    const artist = db.artists.find((a) => a.userId === membership.userId || a.id === membership.artistId);
+    if (artist) {
+      artist.subscriptionTier = membership.planId;
+      artist.plan = membership.planId;
+      await updateById('artists', artist.id, artist);
+    }
+
+    if (user) {
+      db.notifications.push({
+        id: newId(),
+        userId: user.id,
+        type: 'membership_activated',
+        message: `🎉 Membership Activated! Admin has verified your payment via ${membership.paymentMethod}. You are now an active ${membership.planName} tier member with full AI feature privileges.`,
+        isRead: false,
+        createdAt: now(),
+      });
+    }
+  } else {
+    if (user) {
+      user.pendingMembershipPlan = null;
+      await updateById('users', user.id, user);
+
+      db.notifications.push({
+        id: newId(),
+        userId: user.id,
+        type: 'membership_rejected',
+        message: `Membership Application Update: Your ${membership.planName} Plan request could not be verified. Admin Remarks: "${adminNotes || 'Payment verification details did not match.'}". Please re-submit with valid transaction proof.`,
+        isRead: false,
+        createdAt: now(),
+      });
+    }
+  }
+
+  await updateById('memberships', membership.id, membership);
+
+  db.auditLogs.push({
+    id: newId(),
+    adminId: req.user.id,
+    action: status === 'active' ? 'MEMBERSHIP_ACTIVATED' : 'MEMBERSHIP_REJECTED',
+    targetType: 'membership',
+    targetId: membership.id,
+    details: {
+      userId: membership.userId,
+      userName: membership.userName,
+      planId: membership.planId,
+      amount: membership.amount,
+      paymentMethod: membership.paymentMethod,
+      adminNotes,
+    },
+    createdAt: now(),
+  });
+
+  res.json({ success: true, membership });
+});
+
 export default router;

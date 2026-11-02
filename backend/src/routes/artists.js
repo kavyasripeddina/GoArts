@@ -22,6 +22,9 @@ const enrichArtist = (artist) => {
     ? +(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : (reviewCount > 0 ? (artist.rating || 0) : 0);
 
+  // Check if artist is newly created with no verified bookings
+  const isNewlyRegistered = (artist.completedBookings || 0) === 0 && (artist.totalBookings || 0) === 0 && reviews.length === 0;
+
   // Prioritize explicit artistTier set by Admin governance. Fallback to baseline default only if unset.
   const tier = artist.artistTier ? artist.artistTier : (HEADLINE_ESTABLISHED_NAMES.includes(artist.displayName) ? 'established' : 'emerging');
   const isEstablished = tier === 'established';
@@ -67,17 +70,21 @@ const enrichArtist = (artist) => {
         popularityIndex: 98,
       }
     : {
-        talentScore: artist.evaluationMetrics?.talentScore || Math.min(96, Math.max(82, Math.round(76 + (artist.experience || 3) * 3 + (avgRating > 0 ? avgRating * 3 : 6)))),
-        audienceEngagement: artist.evaluationMetrics?.audienceEngagement || (reviewCount > 0 ? 96 : 91),
+        talentScore: isNewlyRegistered ? 80 : (artist.evaluationMetrics?.talentScore || Math.min(96, Math.max(82, Math.round(76 + (artist.experience || 3) * 3 + (avgRating > 0 ? avgRating * 3 : 6))))),
+        audienceEngagement: isNewlyRegistered ? 0 : (artist.evaluationMetrics?.audienceEngagement || (reviewCount > 0 ? 96 : 91)),
         repertoireBreadth: 'Multi-genre Repertoire (Live Vocals, Acoustic, Covers & Fusion)',
         skillLevel: 'Advanced Conservatoire & Stage Performer',
-        liveGigsCount: artist.completedBookings || artist.totalBookings || (reviewCount > 0 ? reviewCount + 12 : 8),
-        reviewScore: avgRating,
+        liveGigsCount: isNewlyRegistered ? 0 : (artist.completedBookings || artist.totalBookings || (reviewCount > 0 ? reviewCount + 12 : 0)),
+        reviewScore: isNewlyRegistered ? 0 : avgRating,
         portfolioReels: artist.evaluationMetrics?.portfolioReels || ['Live Stage Performance Reel', 'Acoustic Studio Session'],
       };
 
   return {
     ...artist,
+    rating: isNewlyRegistered ? 0 : avgRating,
+    reviewCount: isNewlyRegistered ? 0 : reviewCount,
+    totalBookings: artist.totalBookings || 0,
+    completedBookings: artist.completedBookings || 0,
     artistTier: tier,
     verificationStatus: verifStatus,
     adminVerificationNotes: adminNotes,
@@ -538,10 +545,24 @@ router.get('/:id/reviews', (req, res) => {
   res.json({ reviews: enriched });
 });
 
-// POST /api/artists/:id/reviews - Submit review directly for an artist
-router.post('/:id/reviews', authenticate, (req, res) => {
+// POST /api/artists/:id/reviews - Submit review directly for an artist (Requires verified completed booking)
+router.post('/:id/reviews', authenticate, async (req, res) => {
   const artist = db.artists.find((a) => a.id === req.params.id);
   if (!artist) return res.status(404).json({ error: 'Artist not found.' });
+
+  // Genuine Review Policy: verify that the user has booked and completed an event with this artist
+  const userBookings = db.bookings.filter(
+    (b) => b.artistId === artist.id && b.customerId === req.user.id && b.status === 'completed'
+  );
+
+  if (userBookings.length === 0 && req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Authentic Review Policy: You can only review an artist after you have completed a verified event booking with them.'
+    });
+  }
+
+  // Find a completed booking without an existing review if possible
+  const eligibleBooking = userBookings.find((b) => !db.reviews.some((r) => r.bookingId === b.id));
 
   const { rating, comment, eventType } = req.body;
   if (!rating || rating < 1 || rating > 5) {
@@ -550,24 +571,31 @@ router.post('/:id/reviews', authenticate, (req, res) => {
 
   const review = {
     id: newId(),
-    bookingId: null,
+    bookingId: eligibleBooking ? eligibleBooking.id : null,
     customerId: req.user.id,
     customerName: req.user.name,
     customerAadhaarVerified: req.user.aadhaarVerified || false,
     artistId: artist.id,
     rating: Number(rating),
     comment: comment || 'Outstanding live performance, very professional and talented artist!',
-    eventType: eventType || 'Live Performance',
+    eventType: eventType || eligibleBooking?.eventType || 'Live Performance',
     isPublished: true,
     createdAt: now(),
     updatedAt: now(),
   };
-  db.reviews.unshift(review);
+
+  if (eligibleBooking) {
+    eligibleBooking.hasReview = true;
+    await updateById('bookings', eligibleBooking.id, eligibleBooking);
+  }
+
+  await saveItem('reviews', review);
 
   // Recalculate artist rating & review count
   const artistReviews = db.reviews.filter((r) => r.artistId === artist.id && r.isPublished);
   artist.rating = +(artistReviews.reduce((s, r) => s + r.rating, 0) / artistReviews.length).toFixed(1);
   artist.reviewCount = artistReviews.length;
+  await updateById('artists', artist.id, { rating: artist.rating, reviewCount: artist.reviewCount });
 
   res.status(201).json({ 
     review, 

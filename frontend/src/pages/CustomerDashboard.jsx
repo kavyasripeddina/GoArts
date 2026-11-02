@@ -4,10 +4,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Calendar, Heart, Bell, Star, User, Settings, LogOut, Clock, CheckCircle, 
   XCircle, ChevronRight, Music, AlertCircle, ShieldCheck, MessageSquare, 
-  CreditCard, Sparkles, X, PlusCircle, Check, BarChart2, Camera, Upload
+  CreditCard, Sparkles, X, PlusCircle, Check, BarChart2, Camera, Upload, Crown
 } from 'lucide-react';
 import { Navbar, Spinner, StatusBadge, EmptyState, StarRating, formatINR, formatDate } from '../components/shared';
-import { bookingsAPI, miscAPI, authAPI } from '../lib/api';
+import { bookingsAPI, miscAPI, authAPI, aiAPI } from '../lib/api';
 import { useAuth } from '../context/useAuth';
 import { 
   CancelModal, MilestonePaymentModal, ChatModal, AadhaarVerificationModal 
@@ -30,6 +30,7 @@ export default function CustomerDashboard() {
   const [bookings, setBookings] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [membershipStatus, setMembershipStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Modals state
@@ -50,14 +51,16 @@ export default function CustomerDashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [bRes, fRes, nRes] = await Promise.allSettled([
+      const [bRes, fRes, nRes, mRes] = await Promise.allSettled([
         bookingsAPI.myBookings({ role: 'customer', limit: 50 }),
         miscAPI.getFavorites(),
         miscAPI.getNotifications(),
+        aiAPI.myMembership(),
       ]);
       if (bRes.status === 'fulfilled') setBookings(bRes.value.data.bookings || []);
       if (fRes.status === 'fulfilled') setFavorites(fRes.value.data.favorites || []);
       if (nRes.status === 'fulfilled') setNotifications(nRes.value.data.notifications || []);
+      if (mRes.status === 'fulfilled') setMembershipStatus(mRes.value.data);
     } finally {
       setLoading(false);
     }
@@ -151,6 +154,68 @@ export default function CustomerDashboard() {
                 </button>
               )}
             </div>
+
+            {/* Membership Plan Badge & Upgrade Link */}
+            <div style={{ marginTop: '0.65rem' }}>
+              {membershipStatus?.activeMembership ? (
+                <div style={{
+                  background: membershipStatus.isElite ? 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(188,70,57,0.15))' : 'rgba(66,133,244,0.1)',
+                  border: `1px solid ${membershipStatus.isElite ? '#f59e0b' : '#4285F4'}`,
+                  borderRadius: '10px',
+                  padding: '0.35rem 0.65rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.4rem',
+                }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: membershipStatus.isElite ? '#f59e0b' : '#4285F4', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <Crown size={12} /> {membershipStatus.activeMembership.planName || 'Elite Plan'}
+                  </span>
+                  <button
+                    onClick={() => navigate('/premium')}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.68rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Manage
+                  </button>
+                </div>
+              ) : membershipStatus?.pendingMembership ? (
+                <div style={{
+                  background: 'rgba(245,158,11,0.1)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  borderRadius: '10px',
+                  padding: '0.35rem 0.65rem',
+                  fontSize: '0.72rem',
+                  color: '#f59e0b',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}>
+                  <Clock size={12} /> {membershipStatus.pendingMembership.planName} (Under Review)
+                </div>
+              ) : (
+                <button
+                  onClick={() => navigate('/premium')}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(188,70,57,0.12))',
+                    border: '1px dashed #f59e0b',
+                    borderRadius: '10px',
+                    padding: '0.4rem 0.65rem',
+                    color: '#f59e0b',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Crown size={13} /> Upgrade to Elite / Pro
+                </button>
+              )}
+            </div>
           </div>
 
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -183,6 +248,38 @@ export default function CustomerDashboard() {
 
         {/* Main Content */}
         <main style={{ flex: 1, marginLeft: '270px', padding: '2rem', minWidth: 0 }}>
+          {/* Pending Membership Notification Banner */}
+          {membershipStatus?.pendingMembership && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(66, 133, 244, 0.08))',
+              border: '1.5px solid #f59e0b',
+              borderRadius: '16px',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ background: '#f59e0b', borderRadius: '10px', padding: '0.5rem', display: 'flex', color: 'white' }}>
+                  <Crown size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                    ⏳ Your {membershipStatus.pendingMembership.planName} Membership Application is Under Review
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                    Payment method: <strong>{membershipStatus.pendingMembership.paymentMethod?.toUpperCase()}</strong> · Reference: <code style={{ color: '#4285F4' }}>{membershipStatus.pendingMembership.transactionRef}</code>. GoArts Admins are verifying your payment. Privileges will activate upon review.
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => navigate('/premium')} className="btn btn-sm btn-outline" style={{ fontSize: '0.75rem' }}>
+                View Payment Details
+              </button>
+            </div>
+          )}
           {/* Direct Chat Request Alert Banner */}
           {incomingChatRequests.length > 0 && (
             <div style={{

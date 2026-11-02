@@ -103,6 +103,8 @@ export const adminAPI = {
   bookings: (params) => api.get('/admin/bookings', { params }),
   auditLogs: () => api.get('/admin/audit-logs'),
   reseed: () => api.post('/admin/reseed'),
+  memberships: (params) => api.get('/admin/memberships', { params }),
+  reviewMembership: (id, data) => api.put(`/admin/memberships/${id}/review`, data),
 };
 
 // ── AI & Azure Cloud Services ──────────────────────────────
@@ -123,6 +125,9 @@ export const aiAPI = {
   generatePoster: (data) => api.post('/ai/generate-poster', data),
   socialContent: (data) => api.post('/ai/social-content', data),
   subscriptionPlans: () => api.get('/ai/subscription-plans'),
+  generateVideoReel: (data) => api.post('/ai/video-reel/generate', data),
+  requestMembership: (data) => api.post('/ai/memberships/request', data),
+  myMembership: () => api.get('/ai/memberships/my'),
 };
 
 // ── Favorites & Notifications ──────────────────────────────

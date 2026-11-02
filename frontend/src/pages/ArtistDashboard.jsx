@@ -5,10 +5,10 @@ import {
   Calendar, BarChart2, User, Settings, LogOut, Star, DollarSign, Clock, 
   CheckCircle, XCircle, Music, Eye, ChevronRight, Check, MessageSquare, 
   ShieldCheck, AlertTriangle, AlertCircle, PlusCircle, Send, Bell, Upload,
-  Award, Globe, Video, FileText, CheckCircle2, Shield
+  Award, Globe, Video, FileText, CheckCircle2, Shield, Crown
 } from 'lucide-react';
 import { Navbar, Spinner, StatusBadge, EmptyState, formatINR, formatDate } from '../components/shared';
-import { bookingsAPI, artistsAPI, authAPI, miscAPI } from '../lib/api';
+import { bookingsAPI, artistsAPI, authAPI, miscAPI, aiAPI } from '../lib/api';
 import { useAuth } from '../context/useAuth';
 import { 
   CancelModal, ChatModal, AadhaarVerificationModal, MilestonePaymentModal
@@ -32,6 +32,7 @@ export default function ArtistDashboard() {
   const [bookings, setBookings] = useState([]);
   const [artist, setArtist] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [membershipStatus, setMembershipStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -47,14 +48,16 @@ export default function ArtistDashboard() {
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [bRes, aRes, nRes] = await Promise.allSettled([
+      const [bRes, aRes, nRes, mRes] = await Promise.allSettled([
         bookingsAPI.myBookings({ role: 'artist', limit: 50 }),
         artistsAPI.getMyProfile(),
         miscAPI.getNotifications(),
+        aiAPI.myMembership(),
       ]);
       if (bRes.status === 'fulfilled') setBookings(bRes.value.data.bookings || []);
       if (aRes.status === 'fulfilled') setArtist(aRes.value.data.artist);
       if (nRes.status === 'fulfilled') setNotifications(nRes.value.data.notifications || []);
+      if (mRes.status === 'fulfilled') setMembershipStatus(mRes.value.data);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -171,6 +174,68 @@ export default function ArtistDashboard() {
                 </button>
               )}
             </div>
+
+            {/* Membership Plan Badge & Upgrade Link */}
+            <div style={{ marginTop: '0.65rem' }}>
+              {membershipStatus?.activeMembership ? (
+                <div style={{
+                  background: membershipStatus.isElite ? 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(188,70,57,0.15))' : 'rgba(66,133,244,0.1)',
+                  border: `1px solid ${membershipStatus.isElite ? '#f59e0b' : '#4285F4'}`,
+                  borderRadius: '10px',
+                  padding: '0.35rem 0.65rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.4rem',
+                }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: membershipStatus.isElite ? '#f59e0b' : '#4285F4', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <Crown size={12} /> {membershipStatus.activeMembership.planName || 'Pro Plan'}
+                  </span>
+                  <button
+                    onClick={() => navigate('/premium')}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.68rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Manage
+                  </button>
+                </div>
+              ) : membershipStatus?.pendingMembership ? (
+                <div style={{
+                  background: 'rgba(245,158,11,0.1)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  borderRadius: '10px',
+                  padding: '0.35rem 0.65rem',
+                  fontSize: '0.72rem',
+                  color: '#f59e0b',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}>
+                  <Clock size={12} /> {membershipStatus.pendingMembership.planName} (Under Review)
+                </div>
+              ) : (
+                <button
+                  onClick={() => navigate('/premium')}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(188,70,57,0.12))',
+                    border: '1px dashed #f59e0b',
+                    borderRadius: '10px',
+                    padding: '0.4rem 0.65rem',
+                    color: '#f59e0b',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Crown size={13} /> Upgrade to Elite / Pro
+                </button>
+              )}
+            </div>
           </div>
 
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -206,6 +271,38 @@ export default function ArtistDashboard() {
 
         {/* Main Content */}
         <main style={{ flex: 1, marginLeft: '270px', padding: '2rem', minWidth: 0 }}>
+          {/* Pending Membership Notification Banner */}
+          {membershipStatus?.pendingMembership && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(66, 133, 244, 0.08))',
+              border: '1.5px solid #f59e0b',
+              borderRadius: '16px',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ background: '#f59e0b', borderRadius: '10px', padding: '0.5rem', display: 'flex', color: 'white' }}>
+                  <Crown size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                    ⏳ Your {membershipStatus.pendingMembership.planName} Membership Application is Under Review
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                    Payment method: <strong>{membershipStatus.pendingMembership.paymentMethod?.toUpperCase()}</strong> · Reference: <code style={{ color: '#4285F4' }}>{membershipStatus.pendingMembership.transactionRef}</code>. GoArts Admins are verifying the payment proof. Features will unlock automatically upon approval.
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => navigate('/premium')} className="btn btn-sm btn-outline" style={{ fontSize: '0.75rem' }}>
+                View Payment Details
+              </button>
+            </div>
+          )}
           {/* Direct Chat Request Alert Banner */}
           {incomingChatRequests.length > 0 && (
             <div style={{

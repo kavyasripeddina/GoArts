@@ -1,5 +1,6 @@
 // GoArts AI Ecosystem - Comprehensive AI Tools Hub
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Navbar, Footer } from '../components/shared';
 import { aiAPI, artistsAPI } from '../lib/api';
 import {
@@ -24,6 +25,10 @@ import {
   Volume2,
   Radio,
   CheckCircle2,
+  Video,
+  Image,
+  Share2,
+  Crown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -969,6 +974,125 @@ export default function AIEcosystemPage() {
           {activeTab === 'rating' && <RatingTab />}
           {activeTab === 'analytics' && <AnalyticsTab />}
           {activeTab === 'prediction' && <PredictionTab />}
+
+          {/* AI Features for Growth - Elite Suite Banner */}
+          <div style={{
+            marginTop: '3.5rem',
+            paddingTop: '2.5rem',
+            borderTop: '1px solid var(--color-border)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                  <Crown size={15} /> Exclusive Elite Tier Capabilities
+                </div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.2rem' }}>
+                  AI Features for Growth & Promotion
+                </h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                  Next-generation automated promotional tools for artists and premium event organizers.
+                </p>
+              </div>
+              <Link to="/premium" className="btn btn-outline btn-sm" style={{ fontWeight: 700, borderColor: '#f59e0b', color: '#f59e0b' }}>
+                View All Membership Plans
+              </Link>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              {/* Card 1: Video Reel */}
+              <Link
+                to="/ai-reel"
+                style={{
+                  background: 'var(--color-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'transform 0.2s ease, border-color 0.2s ease',
+                }}
+              >
+                <div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #BC4639)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', marginBottom: '1rem' }}>
+                    <Video size={22} />
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    AI Video Reel Generator
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Creates 9:16 vertical promotional reels, shot lists, audio drop cues, and video scripts automatically.
+                  </p>
+                </div>
+                <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f59e0b', fontWeight: 700, fontSize: '0.85rem' }}>
+                  Generate Reels <ChevronRight size={16} />
+                </div>
+              </Link>
+
+              {/* Card 2: Poster Creator */}
+              <Link
+                to="/ai-poster"
+                style={{
+                  background: 'var(--color-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'transform 0.2s ease, border-color 0.2s ease',
+                }}
+              >
+                <div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #BC4639, #ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', marginBottom: '1rem' }}>
+                    <Image size={22} />
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    AI Poster Creator
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Generates concert, wedding, and festival poster concepts with color palettes, typography, and visual assets instantly.
+                  </p>
+                </div>
+                <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#BC4639', fontWeight: 700, fontSize: '0.85rem' }}>
+                  Create Posters <ChevronRight size={16} />
+                </div>
+              </Link>
+
+              {/* Card 3: Social Media Manager */}
+              <Link
+                to="/ai-social"
+                style={{
+                  background: 'var(--color-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'transform 0.2s ease, border-color 0.2s ease',
+                }}
+              >
+                <div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #4285F4, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', marginBottom: '1rem' }}>
+                    <Share2 size={22} />
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    AI Social Media Manager
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Schedules content, creates viral captions for Instagram/YouTube/Twitter, and suggests trending hashtags.
+                  </p>
+                </div>
+                <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#4285F4', fontWeight: 700, fontSize: '0.85rem' }}>
+                  Manage Socials <ChevronRight size={16} />
+                </div>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
       <Footer />

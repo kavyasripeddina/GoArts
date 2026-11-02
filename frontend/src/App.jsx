@@ -19,6 +19,7 @@ import EventsBoardPage from './pages/EventsBoardPage';
 import AIEcosystemPage from './pages/AIEcosystemPage';
 import AIPosterCreatorPage from './pages/AIPosterCreatorPage';
 import AISocialManagerPage from './pages/AISocialManagerPage';
+import AIVideoReelPage from './pages/AIVideoReelPage';
 import ArtistPremiumPage from './pages/ArtistPremiumPage';
 
 import { ThemeProvider } from './context/ThemeContext';
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/ai-ecosystem" element={<AIEcosystemPage />} />
           <Route path="/ai-poster" element={<AIPosterCreatorPage />} />
           <Route path="/ai-social" element={<AISocialManagerPage />} />
+          <Route path="/ai-reel" element={<AIVideoReelPage />} />
           <Route path="/premium" element={<ArtistPremiumPage />} />
 
           {/* Fallback & Catch-All */}

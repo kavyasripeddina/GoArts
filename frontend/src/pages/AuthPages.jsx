@@ -140,6 +140,7 @@ export function RegisterPage() {
     city: '',
     category: 'Singer',
     artistTier: 'emerging',
+    startingPrice: '25000',
   });
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
@@ -220,6 +221,7 @@ export function RegisterPage() {
         city: form.city || 'Hyderabad',
         category: form.role === 'artist' ? resolvedCategory : undefined,
         artistTier: form.role === 'artist' ? form.artistTier : undefined,
+        startingPrice: form.role === 'artist' ? (Number(form.startingPrice) || 25000) : undefined,
         avatar: avatar || undefined,
       };
 
@@ -458,6 +460,27 @@ export function RegisterPage() {
                       <option value="emerging">🚀 Emerging & New Talent</option>
                       <option value="established">👑 Famous & Established Artist</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* Starting Price Input */}
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', margin: 0 }}>Starting Performance Price (₹)</label>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Customers book you based on this minimum quote</span>
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 800 }}>₹</span>
+                    <input
+                      className="form-input"
+                      style={{ paddingLeft: '2.2rem', fontSize: '0.85rem' }}
+                      type="number"
+                      min="1000"
+                      step="1000"
+                      placeholder="e.g. 25000"
+                      value={form.startingPrice}
+                      onChange={e => setForm(p => ({ ...p, startingPrice: e.target.value }))}
+                    />
                   </div>
                 </div>
 
