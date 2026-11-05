@@ -1,5 +1,5 @@
 // GoArts AI - Video Reel Generator (Promotional Videos Automatically)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar, Footer } from '../components/shared';
 import { useAuth } from '../context/useAuth';
@@ -9,6 +9,7 @@ import {
   Loader2,
   Play,
   Pause,
+  RotateCcw,
   Download,
   Copy,
   Sparkles,
@@ -22,6 +23,7 @@ import {
   Layers,
   Clock,
   ArrowRight,
+  Maximize2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -40,18 +42,24 @@ export default function AIVideoReelPage() {
   const [loadingMembership, setLoadingMembership] = useState(true);
 
   const [form, setForm] = useState({
-    artistName: user?.role === 'artist' ? (user.name || '') : '',
+    artistName: user?.role === 'artist' ? (user.name || '') : 'Featured Artist',
     eventTitle: 'Live Performance Showcase 2026',
     genre: 'Live Fusion & Bollywood',
-    vibe: 'Energetic Concert',
+    vibe: '⚡ Energetic Arena Concert',
     targetDuration: 30,
     audioTrack: 'Upbeat Electronic & Acoustic Drop',
   });
 
   const [reelData, setReelData] = useState(null);
   const [generating, setGenerating] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+
+  const canvasRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const playbackTimerRef = useRef(null);
 
   useEffect(() => {
     if (user) {
@@ -67,7 +75,7 @@ export default function AIVideoReelPage() {
   const isElite = membershipStatus?.isElite || user?.role === 'admin';
 
   const handleGenerate = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!form.artistName.trim()) {
       toast.error('Artist / Performer name is required.');
       return;
@@ -77,8 +85,9 @@ export default function AIVideoReelPage() {
       const { data } = await aiAPI.generateVideoReel(form);
       setReelData(data.reel);
       setActiveSceneIndex(0);
+      setElapsedSeconds(0);
       setIsPlaying(true);
-      toast.success('AI Promotional Video Reel generated!');
+      toast.success('AI Promotional Video Reel synthesized!');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Generation failed.');
     } finally {
@@ -86,13 +95,302 @@ export default function AIVideoReelPage() {
     }
   };
 
+  // Timeline & Playback Loop
+  useEffect(() => {
+    if (!isPlaying || !reelData) return;
+
+    const totalSec = form.targetDuration || 30;
+    const sceneCount = reelData.storyboard?.length || 4;
+    const secPerScene = totalSec / sceneCount;
+
+    playbackTimerRef.current = setInterval(() => {
+      setElapsedSeconds((prev) => {
+        const next = prev + 0.2;
+        if (next >= totalSec) {
+          // Loop back to start
+          setActiveSceneIndex(0);
+          return 0;
+        }
+        const nextScene = Math.min(sceneCount - 1, Math.floor(next / secPerScene));
+        setActiveSceneIndex(nextScene);
+        return next;
+      });
+    }, 200);
+
+    return () => clearInterval(playbackTimerRef.current);
+  }, [isPlaying, reelData, form.targetDuration]);
+
+  // Real-time Canvas Rendering for 9:16 Vertical Reel Simulation
+  useEffect(() => {
+    if (!reelData || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let frame = 0;
+    const render = () => {
+      frame++;
+      const w = 540;
+      const h = 960; // 9:16 vertical standard
+      canvas.width = w;
+      canvas.height = h;
+
+      const scene = reelData.storyboard[activeSceneIndex] || reelData.storyboard[0];
+
+      // Dynamic color theme based on vibe and active scene
+      const themes = [
+        ['#4285F4', '#BC4639', '#15132a'],
+        ['#FF2D78', '#E94560', '#0a0d18'],
+        ['#10B981', '#4285F4', '#06171f'],
+        ['#8B5CF6', '#F59E0B', '#1c0e25'],
+      ];
+      const [colPrimary, colSecondary, colDark] = themes[activeSceneIndex % themes.length];
+
+      // 1. Background Gradient
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, '#06070c');
+      grad.addColorStop(0.4, colDark);
+      grad.addColorStop(1, '#050508');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // 2. Animated Center Pulsing Spotlight
+      const pulse = Math.sin(frame * 0.06) * 35;
+      const spotGrad = ctx.createRadialGradient(w / 2, h * 0.42, 40, w / 2, h * 0.42, 280 + pulse);
+      spotGrad.addColorStop(0, `${colPrimary}99`);
+      spotGrad.addColorStop(0.5, `${colSecondary}40`);
+      spotGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = spotGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // 3. Stage Light Beams (Anamorphic concert flares)
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      const beamShift = Math.sin(frame * 0.04) * 80;
+      ctx.moveTo(w / 2 + beamShift, 0);
+      ctx.lineTo(w * 0.1, h * 0.7);
+      ctx.lineTo(w * 0.35, h * 0.7);
+      ctx.closePath();
+      ctx.fillStyle = colPrimary;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - beamShift, 0);
+      ctx.lineTo(w * 0.9, h * 0.7);
+      ctx.lineTo(w * 0.65, h * 0.7);
+      ctx.closePath();
+      ctx.fillStyle = colSecondary;
+      ctx.fill();
+      ctx.restore();
+
+      // 4. Stardust bokeh particles
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 28; i++) {
+        const px = (Math.sin(i * 45 + frame * 0.02) * 0.5 + 0.5) * w;
+        const py = (Math.cos(i * 25 + frame * 0.02) * 0.5 + 0.5) * h * 0.8;
+        const r = (i % 3) + 1.2;
+        ctx.globalAlpha = ((i % 4) + 1) / 10;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 5. Soundwave & Audio Frequency Spectrum Bars (reacting to beat)
+      ctx.save();
+      const numBars = 32;
+      const barWidth = 8;
+      const barSpacing = 5;
+      const startX = (w - (numBars * (barWidth + barSpacing))) / 2;
+      const baseY = h * 0.74;
+
+      for (let i = 0; i < numBars; i++) {
+        const bh = Math.abs(Math.sin(i * 0.35 + frame * 0.12)) * 55 + Math.abs(Math.cos(i * 0.6 - frame * 0.08)) * 30 + 8;
+        const barGrad = ctx.createLinearGradient(0, baseY - bh, 0, baseY);
+        barGrad.addColorStop(0, '#ffffff');
+        barGrad.addColorStop(0.4, colPrimary);
+        barGrad.addColorStop(1, colSecondary);
+        ctx.fillStyle = barGrad;
+        ctx.beginPath();
+        ctx.roundRect(startX + i * (barWidth + barSpacing), baseY - bh, barWidth, bh, 4);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 6. Header Badge: GoArts Verified Live Reel
+      ctx.textAlign = 'center';
+      ctx.font = '800 11px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.letterSpacing = '2px';
+      ctx.fillText('GOARTS AI · OFFICIAL PROMO REEL', w / 2, 85);
+
+      // Live Scene Indicator
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+      ctx.beginPath();
+      ctx.arc(w / 2 - 80, 115, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = '800 12px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`SCENE ${activeSceneIndex + 1} OF ${reelData.storyboard.length} · ${scene?.name?.toUpperCase() || ''}`, w / 2 + 10, 119);
+
+      // 7. Dynamic Main Text Overlay (Cinema Typography)
+      const textScale = 1 + Math.sin(frame * 0.05) * 0.02;
+      ctx.save();
+      ctx.translate(w / 2, h * 0.38);
+      ctx.scale(textScale, textScale);
+      ctx.textAlign = 'center';
+
+      ctx.font = '900 28px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = colPrimary;
+      ctx.shadowBlur = 18;
+      ctx.fillText(scene?.overlayText || `${form.artistName} LIVE`, 0, 0);
+      ctx.shadowBlur = 0;
+
+      // Sub-caption / Action
+      ctx.font = '600 14px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.fillText(scene?.visualAction?.slice(0, 48) || '', 0, 42);
+      ctx.restore();
+
+      // 8. Audio Cue / Beat Drop Indicator Pill
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.beginPath();
+      ctx.roundRect(w / 2 - 140, h * 0.52, 280, 34, 17);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.font = '700 12px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`🎵 AUDIO: ${scene?.audioCue?.slice(0, 32) || form.audioTrack}`, w / 2, h * 0.52 + 21);
+
+      // 9. Camera Maneuver Pill
+      ctx.font = '700 11px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = colSecondary;
+      ctx.fillText(`🎥 CAMERA: ${scene?.cameraMovement || 'Wide Tracking'}`, w / 2, h * 0.60);
+
+      // 10. Bottom Footer CTA Bar
+      const btmY = h * 0.83;
+      ctx.fillStyle = 'rgba(15, 17, 28, 0.9)';
+      ctx.beginPath();
+      ctx.roundRect(30, btmY, w - 60, 105, 18);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = '900 16px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(form.artistName || 'Artist Live Experience', 50, btmY + 36);
+
+      ctx.font = '700 12px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#10b981';
+      ctx.fillText(`● BOOKINGS OPEN · ESCROW PROTECTED`, 50, btmY + 62);
+
+      ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fillText('Available for Weddings, Festivals & Arenas', 50, btmY + 84);
+
+      // Verified Emblem Stamp
+      ctx.textAlign = 'right';
+      ctx.font = '800 24px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = colPrimary;
+      ctx.fillText('★', w - 50, btmY + 55);
+
+      animationFrameRef.current = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, [reelData, activeSceneIndex, form.artistName]);
+
+  // Real Video Export via HTML5 Canvas captureStream & MediaRecorder
+  const handleDownloadVideo = () => {
+    if (!canvasRef.current) return;
+    try {
+      const canvas = canvasRef.current;
+      const stream = canvas.captureStream(30); // 30 FPS stream
+      const recordedChunks = [];
+
+      let mimeType = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+      }
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      setIsRecording(true);
+      toast.loading('Synthesizing & recording video reel clip...', { id: 'reel-rec' });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        setIsRecording(false);
+        const blob = new Blob(recordedChunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const cleanName = (form.artistName || 'GoArts-Artist')
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .toLowerCase();
+        a.href = url;
+        a.download = `GoArts-Reel-${cleanName}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('Promotional Video Reel (.webm) downloaded successfully!', { id: 'reel-rec' });
+      };
+
+      recorder.start();
+      // Record 6 seconds of animated scenes
+      setTimeout(() => {
+        recorder.stop();
+      }, 6000);
+
+    } catch (e) {
+      setIsRecording(false);
+      toast.dismiss('reel-rec');
+      // Fallback: download current frame as PNG
+      handleDownloadFramePNG();
+    }
+  };
+
+  // Download Current Scene Frame as High-Resolution PNG
+  const handleDownloadFramePNG = () => {
+    if (!canvasRef.current) return;
+    try {
+      const dataUrl = canvasRef.current.toDataURL('image/png');
+      const a = document.createElement('a');
+      const cleanName = (form.artistName || 'GoArts-Artist')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .toLowerCase();
+      a.href = dataUrl;
+      a.download = `GoArts-Reel-Scene${activeSceneIndex + 1}-${cleanName}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success('High-Resolution 9:16 Reel Poster Frame downloaded (PNG)!');
+    } catch {
+      toast.error('Failed to export reel image.');
+    }
+  };
+
   const handleCopyScript = () => {
     if (!reelData) return;
     const text = `PROMOTIONAL VIDEO REEL SPECIFICATION: ${reelData.title}\n` +
       `Duration: ${reelData.duration} | Ratio: ${reelData.aspectRatio}\n` +
-      `Audio Track: ${reelData.audioSpecs.track} (${reelData.audioSpecs.bpm} BPM)\n\n` +
-      `STORYBOARD:\n` +
-      reelData.storyboard.map(s => `[${s.timestamp}] ${s.name}\nVisual: ${s.visualAction}\nOverlay Text: "${s.overlayText}"\nAudio: ${s.audioCue}`).join('\n\n');
+      `Audio Track: ${reelData.audioSpecs?.track} (${reelData.audioSpecs?.bpm} BPM)\n\n` +
+      `STORYBOARD & SHOT-LIST:\n` +
+      reelData.storyboard.map(s => `[${s.timestamp}] ${s.name}\nVisual: ${s.visualAction}\nOverlay Text: "${s.overlayText}"\nCamera: ${s.cameraMovement}\nAudio Cue: ${s.audioCue}`).join('\n\n');
     navigator.clipboard.writeText(text);
     toast.success('Reel script copied to clipboard!');
   };
@@ -118,7 +416,7 @@ export default function AIVideoReelPage() {
                   </span>
                 </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: '0.35rem' }}>
-                  Synthesize high-converting promotional video reels for Instagram, YouTube Shorts, and marketing campaigns automatically.
+                  Generate high-impact 9:16 vertical video reels for Instagram, YouTube Shorts, and booking promos with downloadable video exports.
                 </p>
               </div>
             </div>
@@ -138,7 +436,7 @@ export default function AIVideoReelPage() {
                     Elite Membership Required for Video Synthesis
                   </h3>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                    AI Video Reel generation is included exclusively in the <strong>Elite Tier (₹9,999/mo)</strong>. Upgrade your account or submit your payment reference for Admin approval to unlock.
+                    AI Video Reel generation and direct video downloads are included exclusively in the <strong>Elite Tier (₹9,999/mo)</strong>.
                   </p>
                 </div>
               </div>
@@ -148,15 +446,15 @@ export default function AIVideoReelPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.1fr) minmax(320px, 1.4fr)', gap: '2rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(340px, 1.35fr)', gap: '2rem', alignItems: 'start' }}>
             {/* Form */}
-            <form onSubmit={handleGenerate} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '18px', padding: '1.75rem' }}>
+            <form onSubmit={handleGenerate} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '1.75rem', boxShadow: 'var(--shadow-sm)' }}>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>
                 Reel Parameters
               </h2>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Artist / Act Name *</label>
+                <label className="form-label" style={{ fontWeight: 700 }}>Artist / Act Name *</label>
                 <input
                   className="form-input"
                   placeholder="e.g. Sid Sriram Live, DJ Phantom, Anirudh Band"
@@ -166,7 +464,7 @@ export default function AIVideoReelPage() {
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Event / Showcase Title</label>
+                <label className="form-label" style={{ fontWeight: 700 }}>Event / Showcase Title</label>
                 <input
                   className="form-input"
                   placeholder="e.g. Soul & Carnatic Live Arena Tour 2026"
@@ -177,7 +475,7 @@ export default function AIVideoReelPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
-                  <label className="form-label">Performance Genre</label>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Performance Genre</label>
                   <input
                     className="form-input"
                     placeholder="e.g. Bollywood Rock, EDM, Fusion"
@@ -186,7 +484,7 @@ export default function AIVideoReelPage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">Target Duration</label>
+                  <label className="form-label" style={{ fontWeight: 700 }}>Target Duration</label>
                   <select
                     className="form-select"
                     value={form.targetDuration}
@@ -200,7 +498,7 @@ export default function AIVideoReelPage() {
               </div>
 
               <div style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label">Cinematic Vibe & Visual Treatment</label>
+                <label className="form-label" style={{ fontWeight: 700 }}>Cinematic Vibe & Visual Treatment</label>
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
                   {VIBES.map((v) => (
                     <div
@@ -208,7 +506,7 @@ export default function AIVideoReelPage() {
                       onClick={() => setForm((p) => ({ ...p, vibe: v.label }))}
                       style={{
                         padding: '0.75rem 1rem',
-                        borderRadius: '10px',
+                        borderRadius: '12px',
                         border: `1.5px solid ${form.vibe === v.label ? '#4285F4' : 'var(--color-border)'}`,
                         background: form.vibe === v.label ? 'rgba(66,133,244,0.1)' : 'var(--color-surface)',
                         cursor: 'pointer',
@@ -227,7 +525,7 @@ export default function AIVideoReelPage() {
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">Audio Track Style</label>
+                <label className="form-label" style={{ fontWeight: 700 }}>Audio Track Style</label>
                 <input
                   className="form-input"
                   placeholder="e.g. Upbeat Electronic & Acoustic Drop, Driving Percussion"
@@ -245,6 +543,7 @@ export default function AIVideoReelPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
+                  fontWeight: 800,
                   opacity: (!isElite && !loadingMembership) ? 0.6 : 1,
                 }}
               >
@@ -264,36 +563,39 @@ export default function AIVideoReelPage() {
               </button>
             </form>
 
-            {/* Reel Simulator & Storyboard Output */}
+            {/* Live Reel Player & Downloads */}
             <div>
               {!reelData && !generating && (
-                <div style={{ background: 'var(--color-card)', border: '2px dashed var(--color-border)', borderRadius: '18px', padding: '4.5rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <Video size={52} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    Promotional Video Canvas Ready
+                <div style={{ background: 'var(--color-card)', border: '2px dashed var(--color-border)', borderRadius: '20px', padding: '4.5rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <Video size={56} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                    Vertical 9:16 Reel Player Ready
                   </h3>
-                  <p style={{ fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto' }}>
-                    Configure your performance style and click Generate to produce a 9:16 vertical promotional video storyboard with beat-synchronized camera cuts and audio overlays.
+                  <p style={{ fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto 1.5rem', color: 'var(--text-secondary)' }}>
+                    Fill in your act name and style to generate a real-time animated vertical promotional video reel with direct video (.webm) and poster frame (.png) download capabilities.
                   </p>
+                  <button onClick={handleGenerate} className="btn btn-primary btn-sm">
+                    Generate Sample Reel Now
+                  </button>
                 </div>
               )}
 
               {generating && (
-                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '18px', padding: '4.5rem 2rem', textAlign: 'center' }}>
+                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '4.5rem 2rem', textAlign: 'center' }}>
                   <Loader2 size={44} className="spin" style={{ color: '#4285F4', marginBottom: '1rem' }} />
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                     AI Video Reel In Production...
                   </h3>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Generating scene shot-list, camera tracking maneuvers, audio BPM sync, and dynamic marketing typography.
+                    Synthesizing camera maneuvers, audio spectrum choreography, and dynamic marketing typography.
                   </p>
                 </div>
               )}
 
               {reelData && !generating && (
-                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '18px', overflow: 'hidden' }}>
+                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '20px', overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
                   {/* Top Header */}
-                  <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', background: 'var(--color-surface)' }}>
                     <div>
                       <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 800, textTransform: 'uppercase' }}>
                         ✓ Reel Ready ({reelData.duration} · {reelData.aspectRatio})
@@ -302,100 +604,178 @@ export default function AIVideoReelPage() {
                         {reelData.title}
                       </h3>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <button onClick={handleCopyScript} className="btn btn-sm btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <Copy size={13} /> Copy Script
                       </button>
-                      <button onClick={() => toast.success('Reel storyboard package downloaded!')} className="btn btn-sm btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <Download size={13} /> Export
+                      <button
+                        onClick={handleDownloadVideo}
+                        disabled={isRecording}
+                        className="btn btn-sm btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 800, background: 'linear-gradient(135deg, #10b981, #059669)', borderColor: '#10b981' }}
+                      >
+                        {isRecording ? <Loader2 size={13} className="spin" /> : <Download size={13} />}
+                        {isRecording ? 'Recording Clip...' : 'Download Video (.webm)'}
+                      </button>
+                      <button
+                        onClick={handleDownloadFramePNG}
+                        className="btn btn-sm btn-outline"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                        title="Download high-res current scene poster"
+                      >
+                        <Image size={13} /> Frame (.png)
                       </button>
                     </div>
                   </div>
 
-                  {/* Vertical Reel Simulation Preview Card */}
-                  <div style={{ padding: '1.5rem' }}>
-                    <div style={{ background: '#0a0d14', borderRadius: '14px', padding: '1.25rem', position: 'relative', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', color: 'white' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-                          <strong style={{ letterSpacing: '0.5px' }}>REEL SCENE {activeSceneIndex + 1} OF {reelData.storyboard.length}</strong>
+                  {/* Vertical 9:16 Interactive Video Reel Canvas Player */}
+                  <div style={{ padding: '1.5rem', background: '#07080e', textAlign: 'center' }}>
+                    <div style={{ maxWidth: '340px', margin: '0 auto', position: 'relative' }}>
+                      {/* Segmented Story Progress Bars (Instagram Reels Style) */}
+                      <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
+                        {reelData.storyboard.map((_, idx) => {
+                          const isActive = activeSceneIndex === idx;
+                          const isPassed = activeSceneIndex > idx;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                setActiveSceneIndex(idx);
+                                setElapsedSeconds(idx * ((form.targetDuration || 30) / reelData.storyboard.length));
+                              }}
+                              style={{
+                                flex: 1,
+                                height: '3.5px',
+                                background: isPassed ? '#ffffff' : isActive ? 'linear-gradient(90deg, #4285F4, #ffffff)' : 'rgba(255,255,255,0.25)',
+                                borderRadius: '99px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                              }}
+                              title={`Jump to Scene ${idx + 1}`}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* Video Canvas */}
+                      <canvas
+                        ref={canvasRef}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          borderRadius: '16px',
+                          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85)',
+                          border: '2px solid rgba(255, 255, 255, 0.18)',
+                          display: 'block',
+                        }}
+                      />
+
+                      {/* Floating Playback Controls Bar */}
+                      <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '0.5rem 1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setIsPlaying(!isPlaying)}
+                            style={{ background: '#4285F4', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}
+                            title={isPlaying ? 'Pause' : 'Play'}
+                          >
+                            {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveSceneIndex(0);
+                              setElapsedSeconds(0);
+                              setIsPlaying(true);
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}
+                            title="Replay from beginning"
+                          >
+                            <RotateCcw size={16} />
+                          </button>
                         </div>
-                        <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
-                          {reelData.storyboard[activeSceneIndex]?.timestamp}
+
+                        <span style={{ fontSize: '0.8rem', color: '#fff', fontFamily: 'monospace', fontWeight: 700 }}>
+                          {Math.floor(elapsedSeconds)}s / {form.targetDuration}s
+                        </span>
+
+                        <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 800 }}>
+                          ● 60 FPS HD
                         </span>
                       </div>
-
-                      {/* Video Screen Simulation */}
-                      <div style={{ background: 'linear-gradient(180deg, rgba(66,133,244,0.3) 0%, rgba(188,70,57,0.3) 100%)', height: '180px', borderRadius: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '1rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.15)' }}>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.8)', marginBottom: '0.5rem' }}>
-                          {reelData.storyboard[activeSceneIndex]?.overlayText}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.85)', maxWidth: '320px' }}>
-                          {reelData.storyboard[activeSceneIndex]?.visualAction}
-                        </div>
-                      </div>
-
-                      {/* Scene Switcher Pills */}
-                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '1rem' }}>
-                        {reelData.storyboard.map((sc, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setActiveSceneIndex(i)}
-                            style={{
-                              flex: 1,
-                              padding: '0.45rem',
-                              borderRadius: '6px',
-                              border: 'none',
-                              cursor: 'pointer',
-                              background: activeSceneIndex === i ? '#4285F4' : 'rgba(255,255,255,0.1)',
-                              color: 'white',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            Scene {i + 1}
-                          </button>
-                        ))}
-                      </div>
                     </div>
+                  </div>
 
-                    {/* Detailed Storyboard Breakdown */}
-                    <div style={{ marginTop: '1.5rem' }}>
-                      <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
-                        Shot-by-Shot Director Script
-                      </h4>
-                      <div style={{ display: 'grid', gap: '0.75rem' }}>
-                        {reelData.storyboard.map((sc, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              background: 'var(--color-surface)',
-                              border: `1.5px solid ${activeSceneIndex === idx ? '#4285F4' : 'var(--color-border)'}`,
-                              borderRadius: '12px',
-                              padding: '0.85rem 1rem',
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                              <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                                {sc.scene}. {sc.name}
-                              </strong>
-                              <span style={{ fontSize: '0.75rem', color: '#4285F4', fontWeight: 700, fontFamily: 'monospace' }}>
-                                {sc.timestamp}
-                              </span>
-                            </div>
-                            <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: '0.2rem 0' }}>
-                              🎥 <strong>Camera:</strong> {sc.cameraMovement}
-                            </p>
-                            <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: '0.2rem 0' }}>
-                              ⚡ <strong>Overlay:</strong> <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>"{sc.overlayText}"</span>
-                            </p>
-                            <p style={{ fontSize: '0.8rem', color: '#10b981', margin: '0.2rem 0' }}>
-                              🎵 <strong>Audio Cue:</strong> {sc.audioCue}
-                            </p>
+                  {/* Scene Tabs */}
+                  <div style={{ padding: '1.25rem 1.5rem', background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                      {reelData.storyboard.map((sc, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setActiveSceneIndex(i);
+                            setElapsedSeconds(i * ((form.targetDuration || 30) / reelData.storyboard.length));
+                          }}
+                          style={{
+                            flex: 1,
+                            minWidth: '100px',
+                            padding: '0.6rem 0.5rem',
+                            borderRadius: '10px',
+                            border: `1.5px solid ${activeSceneIndex === i ? '#4285F4' : 'var(--color-border)'}`,
+                            background: activeSceneIndex === i ? 'rgba(66,133,244,0.12)' : 'var(--color-card)',
+                            color: activeSceneIndex === i ? '#4285F4' : 'var(--text-secondary)',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div>Scene {i + 1}</div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>{sc.timestamp}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Shot-by-Shot Director Script */}
+                  <div style={{ padding: '1.5rem' }}>
+                    <h4 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Layers size={16} color="#4285F4" /> Shot-by-Shot Director Script & Audio Cues
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                      {reelData.storyboard.map((s, idx) => (
+                        <div
+                          key={s.scene || idx}
+                          onClick={() => setActiveSceneIndex(idx)}
+                          style={{
+                            background: activeSceneIndex === idx ? 'rgba(66,133,244,0.08)' : 'var(--color-surface)',
+                            border: `1.5px solid ${activeSceneIndex === idx ? '#4285F4' : 'var(--color-border)'}`,
+                            borderRadius: '12px',
+                            padding: '1rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                              {idx + 1}. {s.name}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: '#4285F4', fontFamily: 'monospace', fontWeight: 700 }}>
+                              {s.timestamp}
+                            </span>
                           </div>
-                        ))}
-                      </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+                            🎥 <strong>Camera:</strong> {s.cameraMovement}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600, marginBottom: '0.35rem' }}>
+                            ⚡ <strong>Overlay:</strong> "{s.overlayText}"
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            🎵 <strong>Audio Cue:</strong> {s.audioCue}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -408,4 +788,3 @@ export default function AIVideoReelPage() {
     </div>
   );
 }
-

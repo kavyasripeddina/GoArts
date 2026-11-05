@@ -480,7 +480,7 @@ function RatingTab() {
                   src={getArtistImage(selected)}
                   alt={getArtistName(selected)}
                   style={{ width: '76px', height: '76px', borderRadius: '18px', objectFit: 'cover', border: '2px solid #4285F4' }}
-                  onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getArtistName(selected))}&background=4285F4&color=fff&size=76`; }}
+                  onError={(e) => { e.currentTarget.src = generateAvatarSvg(getArtistName(selected), selected.category, 150); }}
                 />
                 <div style={{ flex: 1, minWidth: '200px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -496,7 +496,9 @@ function RatingTab() {
                       {ratingData.label}
                     </span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>📍 {selected.city}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>⭐ {selected.rating}/5 Rating</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      ⭐ {selected.reviewCount > 0 ? `${Number(selected.rating).toFixed(1)}/5 (${selected.reviewCount})` : 'New (0 reviews)'}
+                    </span>
                   </div>
                 </div>
 

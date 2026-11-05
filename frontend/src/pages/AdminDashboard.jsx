@@ -7,7 +7,7 @@ import {
   TrendingUp, Award, Layers, Clock, LogOut, Check, ArrowUpRight,
   Sparkles, Activity, PieChart, Star, MapPin, ArrowRight, Sun, Moon,
   User, Lock, Key, Server, Database, ShieldCheck, CheckCircle2, ChevronRight,
-  ExternalLink, FileText, Globe, CreditCard, Building2, HelpCircle, CheckSquare, MessageSquare, Crown
+  ExternalLink, FileText, Globe, CreditCard, Building2, HelpCircle, CheckSquare, MessageSquare, Crown, UserCheck
 } from 'lucide-react';
 import { Navbar, Spinner, StatusBadge, formatINR, formatDate, EmptyState } from '../components/shared';
 import { adminAPI, authAPI } from '../lib/api';
@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 const TABS = [
   { id: 'overview', label: 'Executive Analytics', icon: BarChart2 },
   { id: 'verifications', label: 'Artist Verification Queue', icon: ShieldCheck },
+  { id: 'customer-kyc', label: 'Customer KYC Verification', icon: UserCheck },
   { id: 'memberships', label: 'Memberships & Revenue', icon: Crown },
   { id: 'artists', label: 'Talent Management', icon: Award },
   { id: 'bookings', label: 'Booking Ledger', icon: Calendar },
@@ -595,7 +596,7 @@ export default function AdminDashboard() {
   const [govNotes, setGovNotes] = useState('');
   const [savingGovernance, setSavingGovernance] = useState(false);
 
-  // Verification tab state
+  // Artist Verification tab state
   const [verifications, setVerifications] = useState([]);
   const [verifCounts, setVerifCounts] = useState(null);
   const [verifFilter, setVerifFilter] = useState('all');
@@ -607,6 +608,12 @@ export default function AdminDashboard() {
   const [auditDecisionLevel, setAuditDecisionLevel] = useState('celebrity_verified');
   const [verifReviewNotes, setVerifReviewNotes] = useState('');
   const [submittingAudit, setSubmittingAudit] = useState(false);
+
+  // Customer KYC tab state (UIDAI Aadhaar IDs)
+  const [customerVerifications, setCustomerVerifications] = useState([]);
+  const [customerVerifCounts, setCustomerVerifCounts] = useState(null);
+  const [customerKycFilter, setCustomerKycFilter] = useState('all');
+  const [loadingCustomerKyc, setLoadingCustomerKyc] = useState(false);
 
   // Bookings tab state
   const [bookings, setBookings] = useState([]);
@@ -758,18 +765,33 @@ export default function AdminDashboard() {
   const fetchVerifications = useCallback(async (filterToFetch = verifFilter, trackToFetch = verifTrackFilter) => {
     setLoadingVerifications(true);
     try {
-      const params = {};
+      const params = { track: 'artists' };
       if (filterToFetch !== 'all') params.status = filterToFetch;
       if (trackToFetch !== 'all') params.tier = trackToFetch;
       const { data } = await adminAPI.verifications(params);
       setVerifications(data.verifications || []);
       setVerifCounts(data.counts || null);
     } catch {
-      toast.error('Failed to load verification applications.');
+      toast.error('Failed to load artist verification applications.');
     } finally {
       setLoadingVerifications(false);
     }
   }, [verifFilter, verifTrackFilter]);
+
+  const fetchCustomerVerifications = useCallback(async (filterToFetch = customerKycFilter) => {
+    setLoadingCustomerKyc(true);
+    try {
+      const params = { track: 'customers' };
+      if (filterToFetch !== 'all') params.status = filterToFetch;
+      const { data } = await adminAPI.verifications(params);
+      setCustomerVerifications(data.verifications || []);
+      setCustomerVerifCounts(data.counts || null);
+    } catch {
+      toast.error('Failed to load customer KYC applications.');
+    } finally {
+      setLoadingCustomerKyc(false);
+    }
+  }, [customerKycFilter]);
 
   useEffect(() => {
     fetchOverview();
@@ -777,12 +799,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeTab === 'verifications') fetchVerifications(verifFilter);
+    else if (activeTab === 'customer-kyc') fetchCustomerVerifications(customerKycFilter);
     else if (activeTab === 'memberships') fetchMemberships();
     else if (activeTab === 'artists') fetchArtists();
     else if (activeTab === 'bookings') fetchBookings();
     else if (activeTab === 'customers') fetchCustomers();
     else if (activeTab === 'logs') fetchAuditLogs();
-  }, [activeTab, verifFilter, fetchVerifications, fetchMemberships, fetchArtists, fetchBookings, fetchCustomers, fetchAuditLogs]);
+  }, [activeTab, verifFilter, customerKycFilter, fetchVerifications, fetchCustomerVerifications, fetchMemberships, fetchArtists, fetchBookings, fetchCustomers, fetchAuditLogs]);
 
   // ── Actions ───────────────────────────────────────────────────
   const handleAuditDecisionSubmit = async () => {
@@ -797,15 +820,19 @@ export default function AdminDashboard() {
       });
       toast.success(
         auditDecisionStatus === 'approved'
-          ? `✓ Verification Approved as ${auditDecisionLevel === 'celebrity_verified' ? '👑 Verified Popular Artist' : '🛡️ Regular KYC Verified'}!`
+          ? (selectedVerifForAudit.isCustomer
+              ? '✓ Customer Aadhaar KYC Approved & Verified!'
+              : `✓ Verification Approved as ${auditDecisionLevel === 'celebrity_verified' ? '👑 Verified Popular Artist' : '🛡️ Regular KYC Verified'}!`)
           : auditDecisionStatus === 'needs_info'
-          ? '📝 Additional information requested from artist.'
+          ? (selectedVerifForAudit.isCustomer ? '📝 Additional KYC clarification requested from client.' : '📝 Additional information requested from artist.')
           : '✕ Verification application decision recorded.'
       );
       setSelectedVerifForAudit(null);
       setVerifReviewNotes('');
       fetchVerifications();
+      fetchCustomerVerifications();
       fetchArtists();
+      fetchCustomers();
       fetchOverview();
       fetchAuditLogs();
     } catch (err) {
@@ -1701,10 +1728,9 @@ export default function AdminDashboard() {
               }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', marginRight: '0.25rem' }}>Track:</span>
                 {[
-                  { id: 'all', label: `All Tracks (${verifCounts?.total || verifications.length})` },
+                  { id: 'all', label: `All Artists (${verifCounts?.artistTotal || verifications.length})` },
                   { id: 'established', label: `👑 Famous & Established (${verifCounts?.establishedClaims || 0})` },
                   { id: 'emerging', label: `🚀 Emerging Talent (${verifCounts?.emergingTalent || 0})` },
-                  { id: 'customer', label: `📋 Client KYC (${verifCounts?.customerKyc || 0})` },
                 ].map((t) => (
                   <button
                     key={t.id}
@@ -2078,6 +2104,222 @@ export default function AdminDashboard() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 1.6: CUSTOMER KYC & AADHAAR VERIFICATION QUEUE */}
+          {activeTab === 'customer-kyc' && (
+            <div style={{ animation: 'fadeIn 0.25s ease' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <UserCheck size={22} color="#10b981" /> Customer KYC & Aadhaar Verification Queue
+                  </h2>
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Government Aadhaar UIDAI identity verification for event clients and bookers. Only verified customers can place high-value bookings.
+                  </p>
+                </div>
+                <button onClick={() => fetchCustomerVerifications(customerKycFilter)} className="btn btn-outline btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <RefreshCw size={14} /> Refresh KYC Queue
+                </button>
+              </div>
+
+              {/* Status Filters */}
+              <div style={{
+                background: 'var(--color-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '16px',
+                padding: '0.85rem 1rem',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+                boxShadow: 'var(--shadow-sm)',
+                alignItems: 'center',
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', marginRight: '0.25rem' }}>Status:</span>
+                {[
+                  { id: 'all', label: `All Clients (${customerVerifCounts?.customerTotal || customerVerifications.length})` },
+                  { id: 'pending', label: `⏳ Pending Audit (${customerVerifCounts?.pending || 0})` },
+                  { id: 'under_review', label: `🔍 Under Investigation (${customerVerifCounts?.under_review || 0})` },
+                  { id: 'needs_info', label: `📝 Additional Info Required (${customerVerifCounts?.needs_info || 0})` },
+                  { id: 'approved', label: `✓ Approved (${customerVerifCounts?.approved || 0})` },
+                  { id: 'rejected', label: `✕ Rejected (${customerVerifCounts?.rejected || 0})` },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      setCustomerKycFilter(f.id);
+                      fetchCustomerVerifications(f.id);
+                    }}
+                    style={{
+                      padding: '0.4rem 0.9rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: customerKycFilter === f.id ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--color-surface)',
+                      color: customerKycFilter === f.id ? '#ffffff' : 'var(--text-secondary)',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {loadingCustomerKyc ? (
+                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '3rem', textAlign: 'center' }}>
+                  <Spinner size={36} center />
+                  <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>Loading customer KYC submissions...</p>
+                </div>
+              ) : customerVerifications.length === 0 ? (
+                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '3rem 2rem', textAlign: 'center' }}>
+                  <CheckCircle2 size={42} color="#10b981" style={{ margin: '0 auto 1rem' }} />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Customer KYC Queue is Clear!</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '450px', margin: '0 auto' }}>
+                    No customer Aadhaar verification submissions currently match this filter.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {customerVerifications.map((v) => (
+                    <div
+                      key={v.id}
+                      style={{
+                        background: 'var(--color-card)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '20px',
+                        padding: '1.5rem',
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <img
+                            src={v.artistImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(v.artistDisplayName || 'Client')}&background=10b981&color=fff`}
+                            alt="Avatar"
+                            style={{ width: '54px', height: '54px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #10b981' }}
+                          />
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                                {v.artistDisplayName}
+                              </h3>
+                              <span style={{ fontSize: '0.72rem', background: 'rgba(16,185,129,0.12)', color: '#10b981', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
+                                Customer / Client Account
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                              Legal Name: <strong style={{ color: 'var(--text-primary)' }}>{v.legalName || '—'}</strong> • Email: <strong style={{ color: 'var(--text-primary)' }}>{v.userEmail || '—'}</strong> • Phone: <strong style={{ color: 'var(--text-primary)' }}>{v.userPhone || '—'}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              padding: '0.35rem 0.85rem',
+                              borderRadius: '999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              background:
+                                v.status === 'approved'
+                                  ? 'rgba(16,185,129,0.15)'
+                                  : v.status === 'rejected'
+                                  ? 'rgba(239,68,68,0.15)'
+                                  : v.status === 'needs_info'
+                                  ? 'rgba(245,158,11,0.15)'
+                                  : 'rgba(66,133,244,0.15)',
+                              color:
+                                v.status === 'approved'
+                                  ? '#10b981'
+                                  : v.status === 'rejected'
+                                  ? '#ef4444'
+                                  : v.status === 'needs_info'
+                                  ? '#f59e0b'
+                                  : '#4285F4',
+                              border: '1px solid currentColor',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            {v.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Aadhaar Details Box */}
+                      <div style={{
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '14px',
+                        padding: '1rem',
+                        marginBottom: '1.25rem',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '0.75rem',
+                        fontSize: '0.82rem',
+                      }}>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>Government ID Proof</span>
+                          <strong style={{ color: '#10b981', fontSize: '0.9rem' }}>{v.idProofType || 'Aadhaar (UIDAI)'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>Aadhaar Number</span>
+                          <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem', letterSpacing: '0.05em' }}>{v.idProofNumber ? `•••• •••• ${v.idProofNumber.slice(-4)}` : 'Document Uploaded'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>City / Location</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{v.userCity || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', fontWeight: 700, textTransform: 'uppercase' }}>Submitted On</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{formatDate(v.createdAt)}</strong>
+                        </div>
+                      </div>
+
+                      {/* Admin Notes / Remarks */}
+                      {v.adminNotes && (
+                        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '0.65rem 0.85rem', marginBottom: '1.25rem', fontSize: '0.8rem' }}>
+                          <strong>Admin Remarks / Audit History:</strong> {v.adminNotes}
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedVerifForAudit(v);
+                            setAuditDecisionStatus('approved');
+                            setAuditDecisionTier('customer');
+                            setAuditDecisionLevel('verified');
+                            setVerifReviewNotes(v.adminNotes || 'Customer identity verified via Government Aadhaar KYC.');
+                          }}
+                          className="btn btn-primary btn-sm"
+                          style={{ fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: '#10b981', borderColor: '#10b981' }}
+                        >
+                          <UserCheck size={14} /> Review Customer Aadhaar KYC
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedVerifForAudit(v);
+                            setAuditDecisionStatus('needs_info');
+                            setVerifReviewNotes(v.adminNotes || 'Please upload a clearer copy of your Government Aadhaar ID.');
+                          }}
+                          className="btn btn-outline btn-sm"
+                          style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.4)', fontWeight: 700 }}
+                        >
+                          📝 Request Clarification
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

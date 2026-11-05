@@ -73,6 +73,11 @@ export default function ArtistPremiumPage() {
       navigate('/login');
       return;
     }
+    if (user.role === 'admin') {
+      toast.success('Admin Master Access: Manage and approve member subscriptions in the Admin Ledger.');
+      navigate('/admin?tab=memberships');
+      return;
+    }
     setActivePlanModal(plan);
     setPaymentMethod('UPI');
     setTransactionRef('');
@@ -139,17 +144,50 @@ export default function ArtistPremiumPage() {
             {user && (
               <div style={{ marginTop: '1.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.75rem', background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '99px', padding: '0.4rem 1.25rem', boxShadow: 'var(--shadow-sm)' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Logged in as <strong>{user.name}</strong></span>
-                <span style={{ background: currentPlan === 'elite' ? '#BC4639' : currentPlan === 'pro' ? '#4285F4' : 'var(--color-surface)', color: currentPlan === 'free' ? 'var(--text-muted)' : 'white', fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.6rem', borderRadius: '99px', textTransform: 'uppercase' }}>
-                  {currentPlan} Tier
-                </span>
+                {user.role === 'admin' ? (
+                  <span style={{ background: 'linear-gradient(135deg, #4285F4, #BC4639)', color: 'white', fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.6rem', borderRadius: '99px', textTransform: 'uppercase' }}>
+                    Super Admin Master
+                  </span>
+                ) : (
+                  <span style={{ background: currentPlan === 'elite' ? '#BC4639' : currentPlan === 'pro' ? '#4285F4' : 'var(--color-surface)', color: currentPlan === 'free' ? 'var(--text-muted)' : 'white', fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.6rem', borderRadius: '99px', textTransform: 'uppercase' }}>
+                    {currentPlan} Tier
+                  </span>
+                )}
               </div>
             )}
           </div>
         </div>
 
         <div className="container" style={{ padding: '3rem 1rem' }}>
+          {/* Admin Master Mode Announcement */}
+          {user?.role === 'admin' && (
+            <div style={{ background: 'linear-gradient(135deg, rgba(66,133,244,0.12), rgba(188,70,57,0.12))', border: '2px solid rgba(66,133,244,0.4)', borderRadius: '20px', padding: '1.5rem 2rem', marginBottom: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, #4285F4, #BC4639)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  <ShieldCheck size={28} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, margin: 0, color: 'var(--text-primary)' }}>
+                    Admin Master Command Active — Zero Subscription Required
+                  </h3>
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    As Platform Administrator, you hold full master privileges. Memberships are designed for Customers and Artists. Admins verify offline/online payments and grant immediate Pro/Elite tier access.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/admin?tab=memberships')}
+                className="btn btn-primary btn-sm"
+                style={{ fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.65rem 1.25rem' }}
+              >
+                <Crown size={16} /> Open Memberships Approval Ledger →
+              </button>
+            </div>
+          )}
+
           {/* Pending Application Alert Banner */}
-          {pendingPlan && (
+          {pendingPlan && user?.role !== 'admin' && (
             <div style={{ background: 'rgba(245,158,11,0.12)', border: '2px solid rgba(245,158,11,0.4)', borderRadius: '16px', padding: '1.25rem 1.5rem', marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <Clock size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
@@ -224,17 +262,17 @@ export default function ArtistPremiumPage() {
 
                   <button
                     onClick={() => handleOpenSubscribe(plan)}
-                    disabled={isCurrent || isPendingThis}
+                    disabled={user?.role !== 'admin' && (isCurrent || isPendingThis)}
                     className="btn btn-full"
                     style={{
                       fontWeight: 800,
-                      background: isCurrent ? '#10b981' : plan.popular ? plan.color : 'transparent',
-                      borderColor: isCurrent ? '#10b981' : plan.color,
-                      color: isCurrent || plan.popular ? 'white' : plan.color,
-                      opacity: isCurrent || isPendingThis ? 0.7 : 1,
+                      background: user?.role === 'admin' ? 'var(--color-surface)' : isCurrent ? '#10b981' : plan.popular ? plan.color : 'transparent',
+                      borderColor: user?.role === 'admin' ? 'var(--color-border)' : isCurrent ? '#10b981' : plan.color,
+                      color: user?.role === 'admin' ? 'var(--text-primary)' : isCurrent || plan.popular ? 'white' : plan.color,
+                      opacity: (user?.role !== 'admin' && (isCurrent || isPendingThis)) ? 0.7 : 1,
                     }}
                   >
-                    {isCurrent ? '✓ Active Plan' : isPendingThis ? '⏳ Under Review' : plan.cta}
+                    {user?.role === 'admin' ? 'Admin Master Access (Manage in Ledger)' : isCurrent ? '✓ Active Plan' : isPendingThis ? '⏳ Under Review' : plan.cta}
                   </button>
                 </div>
               );

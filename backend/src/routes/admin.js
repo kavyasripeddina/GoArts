@@ -449,7 +449,7 @@ router.put('/artists/:id/tier', async (req, res) => {
 
 // GET /api/admin/verifications - Review pending and reviewed artist & customer verifications
 router.get('/verifications', (req, res) => {
-  const { status, tier } = req.query;
+  const { status, tier, track, role } = req.query;
   
   // Include all verification applications (Artist dossiers and Customer Aadhaar KYC)
   const rawList = db.verifications || [];
@@ -488,27 +488,35 @@ router.get('/verifications', (req, res) => {
     };
   });
 
+  const artistOnlyList = list.filter((v) => !v.isCustomer);
+  const customerOnlyList = list.filter((v) => v.isCustomer);
+
   const counts = {
     total: rawList.length,
+    artistTotal: artistOnlyList.length,
+    customerTotal: customerOnlyList.length,
     pending: list.filter((v) => v.status === 'pending' || v.status === 'pending_review').length,
     under_review: list.filter((v) => v.status === 'under_review').length,
     needs_info: list.filter((v) => v.status === 'needs_info').length,
     approved: list.filter((v) => v.status === 'approved').length,
     rejected: list.filter((v) => v.status === 'rejected').length,
-    establishedClaims: list.filter((v) => v.tierRequested === 'established' || v.verificationTrack === 'popular_celebrity').length,
-    emergingTalent: list.filter((v) => (v.tierRequested === 'emerging' || v.verificationTrack === 'regular') && !v.isCustomer).length,
-    customerKyc: list.filter((v) => v.isCustomer).length,
+    establishedClaims: artistOnlyList.filter((v) => v.tierRequested === 'established' || v.verificationTrack === 'popular_celebrity').length,
+    emergingTalent: artistOnlyList.filter((v) => v.tierRequested === 'emerging' || v.verificationTrack === 'regular').length,
+    customerKyc: customerOnlyList.length,
   };
+
+  // Explicit track separation: 'artists' strictly excludes customers; 'customers' strictly excludes artists
+  if (track === 'artists' || role === 'artist') {
+    list = list.filter((v) => !v.isCustomer);
+  } else if (track === 'customers' || role === 'customer' || tier === 'customer') {
+    list = list.filter((v) => v.isCustomer);
+  }
 
   if (status && status !== 'all') {
     list = list.filter((v) => v.status === status);
   }
-  if (tier && tier !== 'all') {
-    if (tier === 'customer') {
-      list = list.filter((v) => v.isCustomer);
-    } else {
-      list = list.filter((v) => v.tierRequested === tier);
-    }
+  if (tier && tier !== 'all' && tier !== 'customer') {
+    list = list.filter((v) => v.tierRequested === tier);
   }
 
   list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

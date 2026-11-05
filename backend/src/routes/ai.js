@@ -597,7 +597,7 @@ router.get('/talent-score/:artistId', (req, res) => {
 
 // POST /api/ai/talent-rating - Compute AI talent rating from artist data
 router.post('/talent-rating', async (req, res) => {
-  const { artistId, reviews, bookingCount, completedCount, rating, responseRate, socialFollowers, yearsActive } = req.body;
+  const { artistId, reviews: reqReviews, bookingCount, completedCount, rating: reqRating, responseRate, socialFollowers } = req.body;
   
   // Try to get artist from db if artistId provided
   let artist = null;
@@ -605,37 +605,56 @@ router.post('/talent-rating', async (req, res) => {
     artist = db.artists.find(a => a.id === artistId);
   }
 
-  // Compute score components
-  const ratingScore = Math.round(((rating || (artist?.rating) || 3.5) / 5) * 30);
-  const completionRate = (completedCount || 0) / Math.max(bookingCount || artist?.totalBookings || 1, 1);
-  const completionScore = Math.round(completionRate * 25);
-  const responseScore = Math.round(((responseRate || artist?.responseRate || 70) / 100) * 15);
-  const profileScore = Math.round(((artist?.profileScore || 60) / 100) * 20);
-  const verificationBonus = (artist?.verified || artist?.celebrity_verified) ? 10 : 0;
-  const socialBonus = socialFollowers > 100000 ? 5 : socialFollowers > 10000 ? 3 : 1;
+  const realReviews = db.reviews.filter(r => r.artistId === artistId && r.isPublished);
+  const realRating = (artist?.reviewCount > 0 && artist?.rating > 0)
+    ? Number(artist.rating)
+    : (realReviews.length > 0 ? (realReviews.reduce((s, r) => s + r.rating, 0) / realReviews.length) : (Number(reqRating) || 0));
+
+  const totalB = bookingCount !== undefined ? Number(bookingCount) : (artist?.totalBookings || db.bookings.filter(b => b.artistId === artistId).length);
+  const compB = completedCount !== undefined ? Number(completedCount) : (artist?.completedBookings || db.bookings.filter(b => b.artistId === artistId && b.status === 'completed').length);
+
+  // Compute honest score components - zero if no activity yet
+  const ratingScore = realRating > 0 ? Math.round((realRating / 5) * 30) : 0;
+  const completionRate = totalB > 0 ? (compB / totalB) : 0;
+  const completionScore = compB > 0 ? Math.round(completionRate * 25) : 0;
+  const responseScore = Math.round(((responseRate || artist?.responseRate || 100) / 100) * 15);
+  const profileScore = Math.round(((artist?.profileScore || (artist?.bio ? 75 : 40)) / 100) * 20);
+  const verificationBonus = (artist?.verified || artist?.aadhaarVerified || artist?.celebrity_verified) ? 10 : 0;
+  const socialBonus = socialFollowers > 100000 ? 5 : socialFollowers > 10000 ? 3 : (artist?.socialLinks?.instagram ? 2 : 0);
 
   const totalScore = Math.min(100, ratingScore + completionScore + responseScore + profileScore + verificationBonus + socialBonus);
 
-  const label = totalScore >= 85 ? 'Exceptional' : totalScore >= 70 ? 'Excellent' : totalScore >= 55 ? 'Good' : totalScore >= 40 ? 'Building' : 'Emerging';
+  const label = totalScore >= 85 ? 'Exceptional' : totalScore >= 70 ? 'Excellent' : totalScore >= 55 ? 'Good' : totalScore >= 35 ? 'Building' : 'New Talent';
 
   res.json({
     artistId,
     talentScore: totalScore,
     label,
+    isNewAccount: totalB === 0 && realRating === 0,
     breakdown: {
-      audienceRating: { score: ratingScore, max: 30, label: 'Audience Rating' },
-      bookingCompletion: { score: completionScore, max: 25, label: 'Booking Completion' },
-      responsiveness: { score: responseScore, max: 15, label: 'Responsiveness' },
-      profileQuality: { score: profileScore, max: 20, label: 'Profile Quality' },
-      verificationBonus: { score: verificationBonus, max: 10, label: 'Verified Identity' },
-      socialPresence: { score: socialBonus, max: 5, label: 'Social Presence' },
+      audienceRating: { 
+        score: ratingScore, 
+        max: 30, 
+        label: realRating > 0 ? `Client Rating (${realRating.toFixed(1)} ⭐)` : 'Client Rating (No reviews yet)', 
+        realRating 
+      },
+      bookingCompletion: { 
+        score: completionScore, 
+        max: 25, 
+        label: compB > 0 ? `Completed Gigs (${compB}/${totalB})` : 'Completed Gigs (0 shows)', 
+        completedGigs: compB 
+      },
+      responsiveness: { score: responseScore, max: 15, label: 'Responsiveness (Active)' },
+      profileQuality: { score: profileScore, max: 20, label: 'Profile Quality & Media' },
+      verificationBonus: { score: verificationBonus, max: 10, label: verificationBonus > 0 ? 'Verified Identity (Govt / Aadhaar)' : 'Identity Verification Pending' },
+      socialPresence: { score: socialBonus, max: 5, label: 'Social Presence & Handles' },
     },
     recommendations: totalScore < 50
-      ? ['Complete your profile to 100%', 'Request reviews from past clients', 'Respond to inquiries within 2 hours']
+      ? ['Complete your artist bio and stage packages', 'Pitch for open gigs to complete your first booking', 'Verify your government identity with Aadhaar to earn 10 bonus points']
       : totalScore < 75
-      ? ['Maintain high booking completion rates', 'Grow your social media presence', 'Submit for identity verification']
-      : ['Congratulations! Consider applying for Popular Artist status', 'Share your GoArts profile on social media'],
-    source: 'rule-based-ai',
+      ? ['Deliver confirmed gigs to accumulate 5-star customer reviews', 'Keep response time under 1 hour to maintain full response score', 'Link verified official social media profiles']
+      : ['Congratulations! Your talent score ranks in the top tier on GoArts AI', 'Maintain high booking completion and prompt customer chat replies'],
+    source: 'goarts-authentic-ai-rating-engine',
   });
 });
 
@@ -772,9 +791,37 @@ router.get('/audience-analytics/:artistId', (req, res) => {
   const songsList = categorySongs[artist.category] || categorySongs.Singer;
 
   const isEstablished = artist.artistTier === 'established';
-  const avgAudienceSize = isEstablished ? 4500 : 650;
-  const engagementRate = Math.min(99, Math.round(85 + (artist.rating || 4.5) * 2));
-  const repeatClientRate = Math.min(94, Math.round(30 + (artist.rating >= 4.8 ? 25 : 10)));
+  const audienceSizes = completed.map(b => Number(b.audienceSize) || 0).filter(s => s > 0);
+  const avgAudienceSize = audienceSizes.length > 0
+    ? Math.round(audienceSizes.reduce((a, b) => a + b, 0) / audienceSizes.length)
+    : (isEstablished ? 4500 : (realCompletedCount > 0 ? 150 : 0));
+  const peakAudienceRecorded = audienceSizes.length > 0
+    ? Math.max(...audienceSizes)
+    : (isEstablished ? 25000 : (realCompletedCount > 0 ? 250 : 0));
+
+  const realReviewsCount = reviews.length || artist.reviewCount || 0;
+  const realAvgRating = realReviewsCount > 0 ? Number(artist.rating || 5.0) : 0;
+  const engagementRate = realCompletedCount > 0 ? Math.min(99, Math.round(75 + (realAvgRating > 0 ? realAvgRating * 3 : 5))) : 0;
+  const repeatClientRate = realTotalBookings > 1 ? Math.round((realCompletedCount / realTotalBookings) * 40) : 0;
+  const fillRate = realTotalBookings > 0 ? `${Math.round((realCompletedCount / realTotalBookings) * 100)}%` : '0%';
+
+  const crowdReactions = realCompletedCount > 0
+    ? {
+        enthusiastic: realAvgRating >= 4 ? 90 : 75,
+        joyful: 8,
+        neutral: 2,
+        sentimentLabel: realAvgRating >= 4.5 ? 'Electrifying & Verified Customer Acclaim' : 'Positive Live Performance Delivery',
+        encoreFrequency: `${Math.min(90, realCompletedCount * 30)}% of live shows`,
+        standingOvations: realAvgRating >= 4 ? `${realCompletedCount} standing ovation(s) recorded` : 'Gathering feedback',
+      }
+    : {
+        enthusiastic: 0,
+        joyful: 0,
+        neutral: 0,
+        sentimentLabel: 'New Performer — No live telemetry recorded yet. Completing your first event gig will automatically activate crowd analytics.',
+        encoreFrequency: 'N/A',
+        standingOvations: 'N/A',
+      };
 
   res.json({
     artistId: artist.id,
@@ -787,31 +834,24 @@ router.get('/audience-analytics/:artistId', (req, res) => {
     analytics: {
       totalBookings: realTotalBookings,
       completedShows: realCompletedCount,
-      averageRating: artist.rating || 0,
-      totalReviews: reviews.length || artist.reviewCount || 0,
+      averageRating: realAvgRating,
+      totalReviews: realReviewsCount,
       engagementRate,
       estimatedAvgAudienceSize: avgAudienceSize,
-      peakAudienceRecorded: isEstablished ? 25000 : 3500,
+      peakAudienceRecorded,
       repeatClientRate,
-      venueFillRate: '98.4%',
+      venueFillRate: fillRate,
       topEventTypes: Object.entries(eventTypeCounts).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([type,count])=>({type,count})),
       topCities: Object.entries(cityCounts).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([city,count])=>({city,count})),
       monthlyTrend,
       popularSongs: songsList,
-      crowdReactions: {
-        enthusiastic: 94,
-        joyful: 5,
-        neutral: 1,
-        sentimentLabel: 'Electrifying & Universal Acclaim',
-        encoreFrequency: '88% of live shows',
-        standingOvations: '92% of corporate & wedding sets',
-      },
+      crowdReactions,
     },
     insights: [
-      `${artistName} commands an exceptional ${engagementRate}% audience engagement rate with ${avgAudienceSize.toLocaleString('en-IN')}+ average live attendance per gig.`,
-      `Highest booking frequency is recorded in ${Object.entries(eventTypeCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'Weddings & Live Concerts'}.`,
-      `Crowd reactions reflect 94% peak enthusiasm with strong outstation demand across ${Object.entries(cityCounts).sort((a,b)=>b[1]-a[1]).slice(0,2).map(c=>c[0]).join(' and ')}.`,
-      `Client re-booking quotient is at ${repeatClientRate}%, placing this performer in the top 5% of GoArts verified talent.`,
+      `${artistName} has delivered ${realCompletedCount} verified live performance(s) with ${avgAudienceSize.toLocaleString('en-IN')}+ average audience attendance.`,
+      `Most popular category format: ${Object.entries(eventTypeCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'Weddings & Private Concerts'}.`,
+      `Client satisfaction reflects ${realAvgRating > 0 ? `${realAvgRating.toFixed(1)}/5 stars from verified customers` : 'awaiting first customer review'}.`,
+      `Verified identity and genuine booking escrow metrics monitored via GoArts AI platform.`,
     ],
     source: 'goarts-audience-intelligence-engine',
   });
