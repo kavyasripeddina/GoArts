@@ -65,10 +65,10 @@ export default function ArtistDashboard() {
 
   useEffect(() => {
     loadData();
-    // Real-time polling so when a customer books or requests chat, it updates at the artist's end!
+    // Real-time polling so when a customer books, pays, or requests chat, it updates at the artist's end!
     const timer = setInterval(() => {
       if (!document.hidden) loadData(true);
-    }, 10000);
+    }, 4000);
     return () => clearInterval(timer);
   }, []);
 
@@ -376,7 +376,7 @@ export default function ArtistDashboard() {
                   { label: 'Pending Requests', value: pendingBookings.length, icon: Clock, color: '#ff5e3a' },
                   { label: 'Active Bookings', value: activeBookings.length, icon: Calendar, color: '#f59e0b' },
                   { label: 'Completed Events', value: completedBookings.length, icon: CheckCircle, color: '#10b981' },
-                  { label: 'Rating', value: `${artist?.rating || '5.0'} ⭐`, icon: Star, color: '#eab308' },
+                  { label: 'Rating', value: (artist?.reviewCount > 0 && Number(artist.rating) > 0) ? `${Number(artist.rating).toFixed(1)} ⭐ (${artist.reviewCount})` : 'New (No reviews yet)', icon: Star, color: '#eab308' },
                 ].map(({ label, value, icon: Icon, color }) => (
                   <div key={label} className="stat-card">
                     <div className="stat-card__icon" style={{ background: `${color}15` }}><Icon size={22} color={color} /></div>

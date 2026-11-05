@@ -1037,6 +1037,8 @@ router.put('/memberships/:id/review', async (req, res) => {
 
     if (user) {
       user.subscriptionTier = membership.planId;
+      user.membershipTier = membership.planId;
+      user.plan = membership.planId;
       user.pendingMembershipPlan = null;
       await updateById('users', user.id, user);
     }
@@ -1045,11 +1047,12 @@ router.put('/memberships/:id/review', async (req, res) => {
     if (artist) {
       artist.subscriptionTier = membership.planId;
       artist.plan = membership.planId;
+      artist.membershipTier = membership.planId;
       await updateById('artists', artist.id, artist);
     }
 
     if (user) {
-      db.notifications.push({
+      await saveItem('notifications', {
         id: newId(),
         userId: user.id,
         type: 'membership_activated',
@@ -1063,7 +1066,7 @@ router.put('/memberships/:id/review', async (req, res) => {
       user.pendingMembershipPlan = null;
       await updateById('users', user.id, user);
 
-      db.notifications.push({
+      await saveItem('notifications', {
         id: newId(),
         userId: user.id,
         type: 'membership_rejected',
@@ -1076,7 +1079,7 @@ router.put('/memberships/:id/review', async (req, res) => {
 
   await updateById('memberships', membership.id, membership);
 
-  db.auditLogs.push({
+  await saveItem('auditLogs', {
     id: newId(),
     adminId: req.user.id,
     action: status === 'active' ? 'MEMBERSHIP_ACTIVATED' : 'MEMBERSHIP_REJECTED',

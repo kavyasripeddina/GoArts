@@ -126,6 +126,7 @@ export const aiAPI = {
   socialContent: (data) => api.post('/ai/social-content', data),
   subscriptionPlans: () => api.get('/ai/subscription-plans'),
   generateVideoReel: (data) => api.post('/ai/video-reel/generate', data),
+  gigPrep: (data) => api.post('/ai/gig-prep', data),
   requestMembership: (data) => api.post('/ai/memberships/request', data),
   myMembership: () => api.get('/ai/memberships/my'),
 };

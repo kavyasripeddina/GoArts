@@ -65,8 +65,9 @@ export const Logo = ({ size = 'md' }) => {
       <div style={{ borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 14px rgba(66, 133, 244, 0.35)' }}>
         <GoArtsLogoIcon size={s.icon} />
       </div>
-      <span className={`${s.text} font-display`} style={{ fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
-        Go<span style={{ background: 'linear-gradient(135deg, #4285F4, #BC4639)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Arts</span>
+      <span className={`${s.text} font-display`} style={{ fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+        <span>Go<span style={{ background: 'linear-gradient(135deg, #4285F4, #BC4639)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Arts</span></span>
+        <span style={{ fontSize: '0.62em', background: 'linear-gradient(135deg, #4285F4, #BC4639)', color: '#fff', padding: '0.12rem 0.42rem', borderRadius: '6px', fontWeight: 900, letterSpacing: '0.5px', lineHeight: 1 }}>AI</span>
       </span>
     </Link>
   );

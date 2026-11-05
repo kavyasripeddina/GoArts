@@ -780,7 +780,7 @@ function ProposalsModal({ event, onClose, onSuccess }) {
                         {p.artist?.aadhaarVerified && <ShieldCheck size={16} color="#10b981" title="Govt ID Verified" />}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {p.artist?.category} • ⭐ {p.artist?.rating || '5.0'} ({p.artist?.reviewCount || 0} reviews)
+                        {p.artist?.category} • ⭐ {p.artist?.reviewCount > 0 ? `${Number(p.artist?.rating).toFixed(1)} (${p.artist?.reviewCount} reviews)` : 'New (No reviews yet)'}
                       </div>
                       {p.artistLocation && (
                         <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem', fontWeight: 600 }}>

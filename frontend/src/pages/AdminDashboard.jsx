@@ -1883,100 +1883,126 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-                        {/* 4 Pillars Authenticity Status for Established / Popular Track */}
-                        {isEstablishedTrack && (
-                          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1rem', fontSize: '0.8rem' }}>
-                            <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <ShieldCheck size={15} color="#4285F4" /> 4-Pillar Instagram-Style Authenticity Evaluation Matrix:
+                        {/* If Customer KYC: Render dedicated Government Aadhaar Details */}
+                        {v.isCustomer ? (
+                          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '1.1rem 1.25rem', marginBottom: '1.25rem', fontSize: '0.84rem' }}>
+                            <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <ShieldCheck size={16} color="#10b981" /> Official Customer Government Identity & Aadhaar Proof
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.6rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: v.legalName ? '#10b981' : '#f59e0b' }}>
-                                {v.legalName ? '✓' : '○'} <strong>1. Authenticity:</strong> {v.legalName ? `Legal: ${v.legalName}` : 'Needs Govt ID'}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#10b981' }}>
-                                ✓ <strong>2. Uniqueness:</strong> Protected Stage Persona
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: v.pressArticles?.length > 0 || v.achievements ? '#10b981' : '#f59e0b' }}>
-                                {v.pressArticles?.length > 0 || v.achievements ? '✓' : '○'} <strong>3. Notability:</strong> {v.pressArticles?.length ? `${v.pressArticles.length} Press Links` : 'Concert History'}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: v.officialLinks?.spotify || v.officialLinks?.instagram ? '#10b981' : '#f59e0b' }}>
-                                {v.officialLinks?.spotify || v.officialLinks?.instagram ? '✓' : '○'} <strong>4. Public Presence:</strong> {v.officialLinks?.instagram ? 'Verified Channels' : 'Links Submitted'}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Submitted Evidence Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '1rem', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
-                          <div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                              Official Social Footprint
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                              {v.officialLinks?.instagram && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  📸 <a href={v.officialLinks.instagram.startsWith('http') ? v.officialLinks.instagram : `https://instagram.com/${v.officialLinks.instagram.replace('@', '')}`} target="_blank" rel="noreferrer" style={{ color: '#4285F4', fontWeight: 600 }}>
-                                    {v.officialLinks.instagram} <ExternalLink size={11} style={{ display: 'inline' }} />
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
+                              <div>Legal Name: <strong style={{ color: '#4285F4' }}>{v.legalName || v.artistDisplayName || '—'}</strong></div>
+                              <div>ID Document Type: <strong>{v.idProofType || 'Aadhaar (UIDAI)'}</strong> {v.idProofNumber ? `(#${v.idProofNumber})` : ''}</div>
+                              <div>Email Address: <strong>{v.userEmail || '—'}</strong></div>
+                              <div>Contact Phone: <strong>{v.userPhone || '—'}</strong></div>
+                              <div>City / Residence: <strong>{v.userCity || '—'}</strong></div>
+                              <div>Account Role: <strong style={{ color: '#10b981' }}>Verified Customer / Event Client</strong></div>
+                              {v.idProofDoc && (
+                                <div style={{ gridColumn: '1 / -1', marginTop: '0.35rem' }}>
+                                  Attachment: <a href={v.idProofDoc} target="_blank" rel="noreferrer" style={{ color: '#4285F4', fontWeight: 700 }}>
+                                    View Uploaded Aadhaar ID Document <ExternalLink size={12} style={{ display: 'inline', marginLeft: '3px' }} />
                                   </a>
                                 </div>
-                              )}
-                              {v.officialLinks?.spotify && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  🎵 <a href={v.officialLinks.spotify} target="_blank" rel="noreferrer" style={{ color: '#10b981', fontWeight: 600 }}>
-                                    Spotify Artist Profile <ExternalLink size={11} style={{ display: 'inline' }} />
-                                  </a>
-                                </div>
-                              )}
-                              {v.officialLinks?.youtube && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  ▶️ <a href={v.officialLinks.youtube} target="_blank" rel="noreferrer" style={{ color: '#ef4444', fontWeight: 600 }}>
-                                    YouTube Channel <ExternalLink size={11} style={{ display: 'inline' }} />
-                                  </a>
-                                </div>
-                              )}
-                              {v.officialLinks?.website && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  🌐 <a href={v.officialLinks.website} target="_blank" rel="noreferrer" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                                    Official Website <ExternalLink size={11} style={{ display: 'inline' }} />
-                                  </a>
-                                </div>
-                              )}
-                              {!v.officialLinks?.instagram && !v.officialLinks?.spotify && !v.officialLinks?.youtube && !v.officialLinks?.website && (
-                                <span style={{ color: 'var(--text-muted)' }}>No social handles submitted</span>
                               )}
                             </div>
                           </div>
-
-                          <div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                              {isEstablishedTrack ? 'Press Coverage & Notability' : 'Performance Experience'}
-                            </div>
-                            {isEstablishedTrack && v.pressArticles?.length > 0 ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '0.5rem' }}>
-                                {v.pressArticles.slice(0, 3).map((art, idx) => (
-                                  <div key={idx} style={{ color: '#4285F4', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                    📰 {art}
+                        ) : (
+                          <>
+                            {/* 4 Pillars Authenticity Status for Established / Popular Track */}
+                            {isEstablishedTrack && (
+                              <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1rem', fontSize: '0.8rem' }}>
+                                <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <ShieldCheck size={15} color="#4285F4" /> 4-Pillar Instagram-Style Authenticity Evaluation Matrix:
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.6rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: v.legalName ? '#10b981' : '#f59e0b' }}>
+                                    {v.legalName ? '✓' : '○'} <strong>1. Authenticity:</strong> {v.legalName ? `Legal: ${v.legalName}` : 'Needs Govt ID'}
                                   </div>
-                                ))}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#10b981' }}>
+                                    ✓ <strong>2. Uniqueness:</strong> Protected Stage Persona
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: v.pressArticles?.length > 0 || v.achievements ? '#10b981' : '#f59e0b' }}>
+                                    {v.pressArticles?.length > 0 || v.achievements ? '✓' : '○'} <strong>3. Notability:</strong> {v.pressArticles?.length ? `${v.pressArticles.length} Press Links` : 'Concert History'}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: v.officialLinks?.spotify || v.officialLinks?.instagram ? '#10b981' : '#f59e0b' }}>
+                                    {v.officialLinks?.spotify || v.officialLinks?.instagram ? '✓' : '○'} <strong>4. Public Presence:</strong> {v.officialLinks?.instagram ? 'Verified Channels' : 'Links Submitted'}
+                                  </div>
+                                </div>
                               </div>
-                            ) : null}
-                            <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.4, maxHeight: '60px', overflowY: 'auto' }}>
-                              {v.achievements || 'No past performance records entered.'}
-                            </p>
-                          </div>
+                            )}
 
-                          <div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                              Identity & Legal Validation
+                            {/* Submitted Evidence Grid */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '1rem', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
+                              <div>
+                                <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                                  Official Social Footprint
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                  {v.officialLinks?.instagram && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      📸 <a href={v.officialLinks.instagram.startsWith('http') ? v.officialLinks.instagram : `https://instagram.com/${v.officialLinks.instagram.replace('@', '')}`} target="_blank" rel="noreferrer" style={{ color: '#4285F4', fontWeight: 600 }}>
+                                        {v.officialLinks.instagram} <ExternalLink size={11} style={{ display: 'inline' }} />
+                                      </a>
+                                    </div>
+                                  )}
+                                  {v.officialLinks?.spotify && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      🎵 <a href={v.officialLinks.spotify} target="_blank" rel="noreferrer" style={{ color: '#10b981', fontWeight: 600 }}>
+                                        Spotify Artist Profile <ExternalLink size={11} style={{ display: 'inline' }} />
+                                      </a>
+                                    </div>
+                                  )}
+                                  {v.officialLinks?.youtube && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      ▶️ <a href={v.officialLinks.youtube} target="_blank" rel="noreferrer" style={{ color: '#ef4444', fontWeight: 600 }}>
+                                        YouTube Channel <ExternalLink size={11} style={{ display: 'inline' }} />
+                                      </a>
+                                    </div>
+                                  )}
+                                  {v.officialLinks?.website && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      🌐 <a href={v.officialLinks.website} target="_blank" rel="noreferrer" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                                        Official Website <ExternalLink size={11} style={{ display: 'inline' }} />
+                                      </a>
+                                    </div>
+                                  )}
+                                  {!v.officialLinks?.instagram && !v.officialLinks?.spotify && !v.officialLinks?.youtube && !v.officialLinks?.website && (
+                                    <span style={{ color: 'var(--text-muted)' }}>No social handles submitted</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                                  {isEstablishedTrack ? 'Press Coverage & Notability' : 'Performance Experience'}
+                                </div>
+                                {isEstablishedTrack && v.pressArticles?.length > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '0.5rem' }}>
+                                    {v.pressArticles.slice(0, 3).map((art, idx) => (
+                                      <div key={idx} style={{ color: '#4285F4', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                        📰 {art}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.4, maxHeight: '60px', overflowY: 'auto' }}>
+                                  {v.achievements || 'No past performance records entered.'}
+                                </p>
+                              </div>
+
+                              <div>
+                                <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                                  Identity & Legal Validation
+                                </div>
+                                <div style={{ color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                  <div>Govt ID: <strong>{v.idProofType || 'Aadhaar (UIDAI)'}</strong> {v.idProofNumber ? `(#${v.idProofNumber})` : ''}</div>
+                                  {v.taxOrUtilityProof && <div>Tax/Utility: <strong>{v.taxOrUtilityProof}</strong></div>}
+                                  <div>Management: <strong>{v.managementContact || 'Self-Represented'}</strong></div>
+                                  {v.performanceReels?.length > 0 && <div>Reels: <strong>{v.performanceReels.length} live video(s)</strong></div>}
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                              <div>Govt ID: <strong>{v.idProofType || 'Aadhaar (UIDAI)'}</strong> {v.idProofNumber ? `(#${v.idProofNumber})` : ''}</div>
-                              {v.taxOrUtilityProof && <div>Tax/Utility: <strong>{v.taxOrUtilityProof}</strong></div>}
-                              <div>Management: <strong>{v.managementContact || 'Self-Represented'}</strong></div>
-                              {v.performanceReels?.length > 0 && <div>Reels: <strong>{v.performanceReels.length} live video(s)</strong></div>}
-                            </div>
-                          </div>
-                        </div>
+                          </>
+                        )}
 
                         {/* Recent Admin Audit Remarks */}
                         {v.adminNotes && (
@@ -1987,33 +2013,67 @@ export default function AdminDashboard() {
 
                         {/* Actions */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedVerifForAudit(v);
-                              setAuditDecisionStatus('approved');
-                              setAuditDecisionTier(v.tierRequested || 'established');
-                              setAuditDecisionLevel(v.tierRequested === 'established' ? 'celebrity_verified' : 'verified');
-                              setVerifReviewNotes(v.adminNotes || '');
-                            }}
-                            className="btn btn-primary btn-sm"
-                            style={{ fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                          >
-                            <ShieldCheck size={14} /> Audit Dossier & Decide
-                          </button>
+                          {v.isCustomer ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedVerifForAudit(v);
+                                  setAuditDecisionStatus('approved');
+                                  setAuditDecisionTier('customer');
+                                  setAuditDecisionLevel('verified');
+                                  setVerifReviewNotes(v.adminNotes || 'Customer identity verified via Government Aadhaar KYC.');
+                                }}
+                                className="btn btn-primary btn-sm"
+                                style={{ fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                              >
+                                <ShieldCheck size={14} /> Review Customer Aadhaar KYC
+                              </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedVerifForAudit(v);
-                              setAuditDecisionStatus('needs_info');
-                              setVerifReviewNotes(v.adminNotes || 'Please upload official Spotify artist URL and utility/tax proof.');
-                            }}
-                            className="btn btn-outline btn-sm"
-                            style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.4)', fontWeight: 700 }}
-                          >
-                            📝 Request Info
-                          </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedVerifForAudit(v);
+                                  setAuditDecisionStatus('needs_info');
+                                  setVerifReviewNotes(v.adminNotes || 'Please upload clear copy of Government Aadhaar ID.');
+                                }}
+                                className="btn btn-outline btn-sm"
+                                style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.4)', fontWeight: 700 }}
+                              >
+                                📝 Request Clarification
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedVerifForAudit(v);
+                                  setAuditDecisionStatus('approved');
+                                  setAuditDecisionTier(v.tierRequested || 'established');
+                                  setAuditDecisionLevel(v.tierRequested === 'established' ? 'celebrity_verified' : 'verified');
+                                  setVerifReviewNotes(v.adminNotes || '');
+                                }}
+                                className="btn btn-primary btn-sm"
+                                style={{ fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                              >
+                                <ShieldCheck size={14} /> Audit Dossier & Decide
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedVerifForAudit(v);
+                                  setAuditDecisionStatus('needs_info');
+                                  setVerifReviewNotes(v.adminNotes || 'Please upload official Spotify artist URL and utility/tax proof.');
+                                }}
+                                className="btn btn-outline btn-sm"
+                                style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.4)', fontWeight: 700 }}
+                              >
+                                📝 Request Info
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -2029,11 +2089,16 @@ export default function AdminDashboard() {
               {/* Header Title */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <Crown size={26} color="#f59e0b" /> Memberships & Subscription Governance
-                  </h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                    Verify payment transaction proofs (UPI/Card/NetBanking/Escrow) and unlock tier privileges for Elite, Pro, and Basic members in real time.
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
+                      <Crown size={26} color="#f59e0b" /> Member Subscription Approvals (Customer & Artist Payment Verification)
+                    </h2>
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(66,133,244,0.15)', color: '#4285F4', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '99px' }}>
+                      Admin Superuser Mode (Full Access Bypass)
+                    </span>
+                  </div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.35rem' }}>
+                    Platform Admin accounts hold permanent master privileges with zero payment required. Review incoming Customer & Artist membership requests, verify payment transaction proofs (UPI/Card/NetBanking), and approve immediate access to Pro and Elite AI features.
                   </p>
                 </div>
 
@@ -2900,7 +2965,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── MODAL 1: VERIFICATION AUDIT & DECISION INSPECTOR ────── */}
+          {/* ── MODAL 1: VERIFICATION AUDIT & DECISION INSPECTOR (CUSTOMER KYC vs ARTIST DOSSIER) ────── */}
           {selectedVerifForAudit && (
             <div style={{
               position: 'fixed',
@@ -2913,18 +2978,183 @@ export default function AdminDashboard() {
               zIndex: 2200,
               padding: '1rem'
             }}>
-              <div style={{
-                background: 'var(--color-card)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '24px',
-                maxWidth: '720px',
-                width: '100%',
-                maxHeight: '90vh',
-                overflowY: 'auto',
-                boxShadow: 'var(--shadow-lg)',
-                padding: '2rem'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+              {selectedVerifForAudit.isCustomer ? (
+                /* ── DEDICATED CUSTOMER GOVT AADHAAR KYC REVIEW MODAL ── */
+                <div style={{
+                  background: 'var(--color-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '24px',
+                  maxWidth: '640px',
+                  width: '100%',
+                  maxHeight: '90vh',
+                  overflowY: 'auto',
+                  boxShadow: 'var(--shadow-lg)',
+                  padding: '2rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <ShieldCheck size={28} color="#10b981" />
+                      <div>
+                        <h3 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                          Verify Customer Government Aadhaar KYC
+                        </h3>
+                        <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          Client Identity & KYC verification for {selectedVerifForAudit.artistDisplayName || selectedVerifForAudit.legalName}
+                        </p>
+                      </div>
+                    </div>
+                    <button onClick={() => setSelectedVerifForAudit(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.4rem' }}>
+                      ✕
+                    </button>
+                  </div>
+
+                  <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.4rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                      <h4 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <CheckSquare size={18} color="#10b981" /> Official Government Identity Record
+                      </h4>
+                      <span className="badge" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 800 }}>
+                        Customer Aadhaar Verification
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
+                      <div>Legal Full Name: <strong style={{ color: '#4285F4' }}>{selectedVerifForAudit.legalName || selectedVerifForAudit.artistDisplayName || '—'}</strong></div>
+                      <div>Document Type: <strong>{selectedVerifForAudit.idProofType || 'Aadhaar (UIDAI)'}</strong> {selectedVerifForAudit.idProofNumber ? `(#${selectedVerifForAudit.idProofNumber})` : ''}</div>
+                      <div>Registered Email: <strong>{selectedVerifForAudit.userEmail || '—'}</strong></div>
+                      <div>Phone Number: <strong>{selectedVerifForAudit.userPhone || '—'}</strong></div>
+                      <div>Location / City: <strong>{selectedVerifForAudit.userCity || '—'}</strong></div>
+                      <div>Account Role: <strong style={{ color: '#10b981' }}>Customer / Event Client</strong></div>
+                      {selectedVerifForAudit.idProofDoc && (
+                        <div style={{ gridColumn: '1 / -1', marginTop: '0.4rem', padding: '0.65rem 0.85rem', background: 'var(--color-card)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                          Uploaded Identity Proof: <a href={selectedVerifForAudit.idProofDoc} target="_blank" rel="noreferrer" style={{ color: '#4285F4', fontWeight: 700 }}>
+                            View Aadhaar Document File <ExternalLink size={12} style={{ display: 'inline', marginLeft: '4px' }} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedVerifForAudit.auditTrail?.length > 0 && (
+                      <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(66,133,244,0.05)', borderRadius: '10px', border: '1px solid rgba(66,133,244,0.2)', fontSize: '0.78rem' }}>
+                        <div style={{ fontWeight: 800, color: '#4285F4', marginBottom: '0.3rem' }}>📜 KYC Submission & Audit Trail:</div>
+                        {selectedVerifForAudit.auditTrail.map((log, i) => (
+                          <div key={i} style={{ color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                            • <strong>{formatDate(log.timestamp)}</strong>: {log.action} by {log.by} ({log.notes})
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Decision Selection for Customer KYC */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <label className="form-label" style={{ fontWeight: 800 }}>Customer KYC Decision</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuditDecisionStatus('approved');
+                          setAuditDecisionTier('customer');
+                          setAuditDecisionLevel('verified');
+                          setVerifReviewNotes('Customer Government Aadhaar KYC verified successfully.');
+                        }}
+                        style={{
+                          padding: '0.85rem',
+                          borderRadius: '12px',
+                          border: auditDecisionStatus === 'approved' ? '2px solid #10b981' : '1px solid var(--color-border)',
+                          background: auditDecisionStatus === 'approved' ? 'rgba(16,185,129,0.1)' : 'var(--color-surface)',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, color: '#10b981', fontSize: '0.88rem' }}>✓ Approve Aadhaar KYC</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>Grants Verified Customer Shield Badge</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuditDecisionStatus('needs_info');
+                          setVerifReviewNotes('Please upload a clear copy of your Aadhaar card (front and back).');
+                        }}
+                        style={{
+                          padding: '0.85rem',
+                          borderRadius: '12px',
+                          border: auditDecisionStatus === 'needs_info' ? '2px solid #f59e0b' : '1px solid var(--color-border)',
+                          background: auditDecisionStatus === 'needs_info' ? 'rgba(245,158,11,0.1)' : 'var(--color-surface)',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, color: '#f59e0b', fontSize: '0.88rem' }}>📝 Request Clear Copy</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>Prompts customer to re-upload ID</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuditDecisionStatus('rejected');
+                          setVerifReviewNotes('Aadhaar number does not match submitted name.');
+                        }}
+                        style={{
+                          padding: '0.85rem',
+                          borderRadius: '12px',
+                          border: auditDecisionStatus === 'rejected' ? '2px solid #ef4444' : '1px solid var(--color-border)',
+                          background: auditDecisionStatus === 'rejected' ? 'rgba(239,68,68,0.1)' : 'var(--color-surface)',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, color: '#ef4444', fontSize: '0.88rem' }}>✕ Reject KYC</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>Declines verification with reason</div>
+                      </button>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label" style={{ fontWeight: 800 }}>Admin Remarks / Reason for Customer Decision *</label>
+                      <textarea
+                        className="form-textarea"
+                        rows={3}
+                        placeholder="Add remarks or specific message to customer regarding KYC verification..."
+                        value={verifReviewNotes}
+                        onChange={(e) => setVerifReviewNotes(e.target.value)}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setSelectedVerifForAudit(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={submittingAudit}
+                        onClick={handleAuditDecisionSubmit}
+                        style={{ fontWeight: 800 }}
+                      >
+                        {submittingAudit ? 'Recording Decision...' : 'Commit Customer KYC Decision'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ── EXISTING 4-PILLAR ARTIST VERIFICATION DOSSIER MODAL ── */
+                <div style={{
+                  background: 'var(--color-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '24px',
+                  maxWidth: '720px',
+                  width: '100%',
+                  maxHeight: '90vh',
+                  overflowY: 'auto',
+                  boxShadow: 'var(--shadow-lg)',
+                  padding: '2rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <ShieldCheck size={26} color="#4285F4" />
                     <div>
@@ -3291,6 +3521,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -3696,7 +3927,7 @@ export default function AdminDashboard() {
                   <div style={{ padding: '0.85rem', background: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Client Reviews</span>
                     <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#f59e0b', marginTop: '0.15rem' }}>
-                      ★ {selectedArtist.rating || '5.0'} ({selectedArtist.reviewCount || 0})
+                      {selectedArtist.reviewCount > 0 ? `★ ${Number(selectedArtist.rating).toFixed(1)} (${selectedArtist.reviewCount})` : '★ New (0 reviews)'}
                     </div>
                   </div>
                 </div>

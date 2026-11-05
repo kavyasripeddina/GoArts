@@ -257,10 +257,40 @@ export function ChatModal({ booking, onClose, currentUser, onChatUpdated }) {
   };
 
   useEffect(() => {
-    if (chatState.chatEnabled) {
+    let isMounted = true;
+
+    if (!chatState.chatEnabled) {
+      // Polling to detect counterpart acceptance (e.g. Artist accepting Customer's request or vice versa)
+      const checkStatus = async () => {
+        try {
+          const { data } = await bookingsAPI.getById(booking.id);
+          const b = data.booking;
+          if (b && b.chatEnabled && isMounted) {
+            setChatState({
+              chatEnabled: true,
+              chatRequestedBy: 'both',
+            });
+            if (onChatUpdated) {
+              onChatUpdated(b);
+            }
+            loadMessages();
+          }
+        } catch {}
+      };
+
+      const interval = setInterval(checkStatus, 2500);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
+    } else {
+      // Chat is enabled: poll for new messages in real time
       loadMessages();
-      const interval = setInterval(loadMessages, 4000);
-      return () => clearInterval(interval);
+      const interval = setInterval(loadMessages, 2500);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
     }
   }, [booking.id, chatState.chatEnabled]);
 

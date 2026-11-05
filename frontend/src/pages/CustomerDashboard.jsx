@@ -1,16 +1,16 @@
 // GoArts AI - Customer Dashboard with Split Payments, Mutual Chat & Verified KYC
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  Calendar, Heart, Bell, Star, User, Settings, LogOut, Clock, CheckCircle, 
-  XCircle, ChevronRight, Music, AlertCircle, ShieldCheck, MessageSquare, 
+import {
+  Calendar, Heart, Bell, Star, User, Settings, LogOut, Clock, CheckCircle,
+  XCircle, ChevronRight, Music, AlertCircle, ShieldCheck, MessageSquare,
   CreditCard, Sparkles, X, PlusCircle, Check, BarChart2, Camera, Upload, Crown
 } from 'lucide-react';
 import { Navbar, Spinner, StatusBadge, EmptyState, StarRating, formatINR, formatDate } from '../components/shared';
 import { bookingsAPI, miscAPI, authAPI, aiAPI } from '../lib/api';
 import { useAuth } from '../context/useAuth';
-import { 
-  CancelModal, MilestonePaymentModal, ChatModal, AadhaarVerificationModal 
+import {
+  CancelModal, MilestonePaymentModal, ChatModal, AadhaarVerificationModal
 } from '../components/BookingActionsModal';
 import toast from 'react-hot-toast';
 
@@ -46,10 +46,14 @@ export default function CustomerDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    const interval = setInterval(() => {
+      loadDashboardData(true);
+    }, 4000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadDashboardData = async () => {
-    setLoading(true);
+  const loadDashboardData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [bRes, fRes, nRes, mRes] = await Promise.allSettled([
         bookingsAPI.myBookings({ role: 'customer', limit: 50 }),
@@ -62,7 +66,7 @@ export default function CustomerDashboard() {
       if (nRes.status === 'fulfilled') setNotifications(nRes.value.data.notifications || []);
       if (mRes.status === 'fulfilled') setMembershipStatus(mRes.value.data);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -85,17 +89,17 @@ export default function CustomerDashboard() {
     try {
       await miscAPI.markAllRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch {}
+    } catch { }
   };
 
   const handleAcceptDirectChat = async (booking) => {
     try {
       const { data } = await bookingsAPI.requestChat(booking.id);
       const isEnabled = Boolean(data.chatEnabled);
-      const updated = data.booking || { 
-        ...booking, 
-        chatEnabled: isEnabled, 
-        chatRequestedBy: isEnabled ? 'both' : 'customer' 
+      const updated = data.booking || {
+        ...booking,
+        chatEnabled: isEnabled,
+        chatRequestedBy: isEnabled ? 'both' : 'customer'
       };
       setBookings(prev => prev.map(b => b.id === booking.id ? updated : b));
       setChatModalBooking(updated);
@@ -119,8 +123,8 @@ export default function CustomerDashboard() {
         {/* Sidebar */}
         <aside style={{ width: '270px', background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)', position: 'fixed', top: '64px', left: 0, bottom: 0, overflowY: 'auto', zIndex: 100, padding: '1.5rem 1rem' }}>
           {/* User card */}
-          <div 
-            onClick={() => handleTabChange('profile')} 
+          <div
+            onClick={() => handleTabChange('profile')}
             style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.25rem 1rem', marginBottom: '1.5rem', textAlign: 'center', boxShadow: 'var(--shadow-sm)', cursor: 'pointer', transition: 'all 0.2s' }}
             title="Click to view My Profile & KYC"
           >
@@ -146,7 +150,7 @@ export default function CustomerDashboard() {
                   <ShieldCheck size={13} /> Govt ID Verified
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={() => setShowKycModal(true)}
                   style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '999px', padding: '0.25rem 0.6rem', fontSize: '0.7rem', color: '#f59e0b', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                 >
@@ -364,29 +368,87 @@ export default function CustomerDashboard() {
                 ))}
               </div>
 
+              {/* Action Required Alert: Performance Completed — Settle 50% Balance & Review */}
+              {completedBookings.some(b => b.paymentStatus === 'advance_paid' || !b.hasReview) && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(66,133,244,0.12), rgba(188,70,57,0.12))',
+                  border: '1.5px solid #4285F4',
+                  borderRadius: '18px',
+                  padding: '1.25rem 1.5rem',
+                  marginBottom: '1.75rem',
+                  boxShadow: '0 4px 20px rgba(66,133,244,0.15)',
+                  animation: 'fadeIn 0.3s ease'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                    <span style={{ fontSize: '1.25rem' }}>⚡</span>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                      Action Required: Performance Completed by Artist
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.5' }}>
+                    The artist has completed their live show. Please pay the remaining 50% balance to release the final payout, and share your experience with a rating & review!
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {completedBookings.filter(b => b.paymentStatus === 'advance_paid' || !b.hasReview).map(b => (
+                      <CustomerBookingCard 
+                        key={`action-${b.id}`} 
+                        booking={b} 
+                        onCancel={() => setCancelModalBooking(b)} 
+                        onPay={(milestone) => setPaymentModalData({ booking: b, milestone })}
+                        onChat={() => setChatModalBooking(b)}
+                        onAcceptChat={handleAcceptDirectChat}
+                        onReview={setReviewModal} 
+                        navigate={navigate} 
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Upcoming bookings */}
               <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-primary)' }}>Upcoming Events</h3>
               {upcomingBookings.length === 0 ? (
-                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '2rem' }}>
                   No upcoming bookings. <button onClick={() => navigate('/artists')} style={{ background: 'transparent', border: 'none', color: '#4285F4', cursor: 'pointer', fontWeight: 600 }}>Discover artists</button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '2rem' }}>
                   {upcomingBookings.slice(0, 3).map(b => (
-                    <CustomerBookingCard 
-                      key={b.id} 
-                      booking={b} 
-                      onCancel={() => setCancelModalBooking(b)} 
+                    <CustomerBookingCard
+                      key={b.id}
+                      booking={b}
+                      onCancel={() => setCancelModalBooking(b)}
                       onPay={(milestone) => setPaymentModalData({ booking: b, milestone })}
                       onChat={() => setChatModalBooking(b)}
                       onAcceptChat={handleAcceptDirectChat}
-                      onReview={setReviewModal} 
-                      navigate={navigate} 
+                      onReview={setReviewModal}
+                      navigate={navigate}
                     />
                   ))}
                   {upcomingBookings.length > 3 && (
                     <button className="btn btn-secondary btn-sm" onClick={() => handleTabChange('bookings')}>View all {upcomingBookings.length} bookings <ChevronRight size={14} /></button>
                   )}
+                </div>
+              )}
+
+              {/* Completed bookings section on Overview */}
+              {completedBookings.length > 0 && (
+                <div>
+                  <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-primary)' }}>Past & Completed Performances</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {completedBookings.slice(0, 2).map(b => (
+                      <CustomerBookingCard 
+                        key={b.id} 
+                        booking={b} 
+                        onCancel={() => setCancelModalBooking(b)} 
+                        onPay={(milestone) => setPaymentModalData({ booking: b, milestone })}
+                        onChat={() => setChatModalBooking(b)}
+                        onAcceptChat={handleAcceptDirectChat}
+                        onReview={setReviewModal} 
+                        navigate={navigate} 
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -408,15 +470,15 @@ export default function CustomerDashboard() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                   {bookings.map(b => (
-                    <CustomerBookingCard 
-                      key={b.id} 
-                      booking={b} 
-                      onCancel={() => setCancelModalBooking(b)} 
+                    <CustomerBookingCard
+                      key={b.id}
+                      booking={b}
+                      onCancel={() => setCancelModalBooking(b)}
                       onPay={(milestone) => setPaymentModalData({ booking: b, milestone })}
                       onChat={() => setChatModalBooking(b)}
                       onAcceptChat={handleAcceptDirectChat}
-                      onReview={setReviewModal} 
-                      navigate={navigate} 
+                      onReview={setReviewModal}
+                      navigate={navigate}
                     />
                   ))}
                 </div>
@@ -484,10 +546,10 @@ export default function CustomerDashboard() {
 
           {/* Profile & KYC Settings */}
           {(activeTab === 'profile' || activeTab === 'settings') && (
-            <ProfileSettings 
-              user={user} 
-              updateUser={updateUser} 
-              onOpenKyc={() => setShowKycModal(true)} 
+            <ProfileSettings
+              user={user}
+              updateUser={updateUser}
+              onOpenKyc={() => setShowKycModal(true)}
             />
           )}
         </main>
@@ -565,11 +627,11 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
   return (
     <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '18px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', boxShadow: 'var(--shadow-sm)' }}>
       {booking.artist?.image && (
-        <img 
-          src={booking.artist.image} 
-          alt={booking.artist?.displayName} 
-          style={{ width: '64px', height: '64px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0 }} 
-          onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(booking.artist?.displayName || 'A')}&background=BC4639&color=fff`; }} 
+        <img
+          src={booking.artist.image}
+          alt={booking.artist?.displayName}
+          style={{ width: '64px', height: '64px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0 }}
+          onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(booking.artist?.displayName || 'A')}&background=BC4639&color=fff`; }}
         />
       )}
       <div style={{ flex: 1, minWidth: '240px' }}>
@@ -677,8 +739,8 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {/* Chat Button with Mutual Awareness */}
         {booking.chatRequestedBy === 'artist' && !booking.chatEnabled ? (
-          <button 
-            className="btn btn-primary btn-sm" 
+          <button
+            className="btn btn-primary btn-sm"
             onClick={() => onAcceptChat ? onAcceptChat(booking) : onChat()}
             style={{
               display: 'flex',
@@ -697,8 +759,8 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
             Accept Chat Request
           </button>
         ) : booking.chatRequestedBy === 'customer' && !booking.chatEnabled ? (
-          <button 
-            className="btn btn-secondary btn-sm" 
+          <button
+            className="btn btn-secondary btn-sm"
             onClick={onChat}
             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.35)' }}
             title="You requested a direct chat. Waiting for artist to accept."
@@ -707,8 +769,8 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
             Chat Pending (Waiting)
           </button>
         ) : (
-          <button 
-            className="btn btn-secondary btn-sm" 
+          <button
+            className="btn btn-secondary btn-sm"
             onClick={onChat}
             style={{
               display: 'flex',
@@ -734,8 +796,8 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
 
         {/* 50% Advance Pay Button (Only active when artist has accepted/quoted) */}
         {canPayAdvance && (
-          <button 
-            className="btn btn-primary btn-sm" 
+          <button
+            className="btn btn-primary btn-sm"
             onClick={() => onPay('advance')}
             style={{
               display: 'flex',
@@ -760,8 +822,8 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
 
         {/* 50% Balance Pay Button (Only after artist completes show) */}
         {canPayBalance && (
-          <button 
-            className="btn btn-primary btn-sm" 
+          <button
+            className="btn btn-primary btn-sm"
             onClick={() => onPay('balance')}
             style={{
               display: 'flex',
@@ -778,8 +840,8 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
 
         {/* Rate & Review Button (Only after performance is completed) */}
         {booking.status === 'completed' && (!booking.hasReview ? (
-          <button 
-            className="btn btn-primary btn-sm" 
+          <button
+            className="btn btn-primary btn-sm"
             onClick={() => onReview(booking)}
             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'linear-gradient(135deg, #f59e0b, #BC4639)', borderColor: '#f59e0b', color: '#fff', fontWeight: 700 }}
             title="Leave a star rating & review for this artist"
@@ -794,9 +856,9 @@ function CustomerBookingCard({ booking, onCancel, onPay, onChat, onAcceptChat, o
 
         {/* Cancel Button */}
         {canCancel && (
-          <button 
-            className="btn btn-secondary btn-sm" 
-            onClick={onCancel} 
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onCancel}
             style={{ color: '#ef4444', borderColor: '#ef4444' }}
           >
             Cancel Request

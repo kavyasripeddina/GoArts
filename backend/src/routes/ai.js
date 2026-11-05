@@ -218,7 +218,19 @@ const attachArtistRecommendations = (suggestedCategories, budget) => {
       return true;
     }).sort((a, b) => b.rating - a.rating).slice(0, 2);
 
-    artistRecommendations.push({ category: cat, artists: matches });
+    const enrichedMatches = matches.map((a) => {
+      const name = a.displayName || a.name || 'Verified Performer';
+      const img = a.image || a.images?.[0] || a.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4285F4&color=fff&size=300`;
+      return {
+        ...a,
+        displayName: name,
+        stageName: name,
+        image: img,
+        profileImage: img,
+      };
+    });
+
+    artistRecommendations.push({ category: cat, artists: enrichedMatches });
   }
   return artistRecommendations;
 };
@@ -1221,6 +1233,23 @@ router.get('/memberships/my', authenticate, (req, res) => {
   const user = db.users.find((u) => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found.' });
 
+  // Admins have automatic full access to everything without needing any subscription
+  if (user.role === 'admin') {
+    return res.json({
+      currentPlan: 'admin',
+      isElite: true,
+      isPro: true,
+      isAdmin: true,
+      activeMembership: {
+        planId: 'elite',
+        planName: 'Platform Super Admin',
+        status: 'active',
+      },
+      pendingMembership: null,
+      history: [],
+    });
+  }
+
   const memberships = (db.memberships || [])
     .filter((m) => m.userId === user.id)
     .sort((a, b) => new Date(b.requestedAt || b.createdAt) - new Date(a.requestedAt || a.createdAt));
@@ -1228,14 +1257,76 @@ router.get('/memberships/my', authenticate, (req, res) => {
   const active = memberships.find((m) => m.status === 'active');
   const pending = memberships.find((m) => m.status === 'pending');
 
+  const resolvedTier = active?.planId || user.subscriptionTier || user.membershipTier || user.plan || 'free';
+  const isElite = resolvedTier === 'elite' || user.role === 'admin';
+  const isPro = ['pro', 'elite'].includes(resolvedTier) || user.role === 'admin';
+
   res.json({
-    currentPlan: active?.planId || user.subscriptionTier || 'free',
-    isElite: (active?.planId || user.subscriptionTier) === 'elite' || user.role === 'admin',
-    isPro: ['pro', 'elite'].includes(active?.planId || user.subscriptionTier) || user.role === 'admin',
+    currentPlan: resolvedTier,
+    isElite,
+    isPro,
+    isAdmin: user.role === 'admin',
     activeMembership: active || null,
     pendingMembership: pending || null,
     history: memberships,
   });
+});
+
+// ── Artist AI Gig & Event Preparation Assistant ─────────────────
+// Allows artists to generate professional setlists, stage riders, timelines, and crowd management strategies for any event
+router.post('/gig-prep', authenticate, async (req, res) => {
+  const { eventType = 'Wedding Sangeet', durationMinutes = 90, audienceVibe = 'High Energy', genre = 'Bollywood & Tollywood Live Fusion', venueType = 'Outdoor Banquet Lawn', specialRequests = '' } = req.body;
+
+  const totalMins = Number(durationMinutes) || 90;
+  const songCount = Math.max(6, Math.round(totalMins / 5));
+
+  const plan = {
+    eventType,
+    durationMinutes: totalMins,
+    audienceVibe,
+    genre,
+    venueType,
+    specialRequests,
+    curatedSetlist: [
+      { order: 1, title: 'Atmospheric Intro & Grand Welcome Hook', duration: '4 min', energy: '70%', tempo: 'Mid-Tempo', cue: 'Stage entry with ambient pads & dramatic lighting drop' },
+      { order: 2, title: 'Signature Opening Anthem / High-tempo Hit', duration: '5 min', energy: '88%', tempo: 'Upbeat (128 BPM)', cue: 'Dhol accent on drop; crowd standing invitation' },
+      { order: 3, title: 'Classic Crowd-pleasing Fusion Medley', duration: '8 min', energy: '82%', tempo: 'Groovy', cue: 'Transition to acoustic keys & percussion bridge' },
+      { order: 4, title: 'Emotional Ballad / Couple Special Dedication', duration: '6 min', energy: '65%', tempo: 'Soulful & Slow', cue: 'Warm amber spotlights; invite audience phone flashlights' },
+      { order: 5, title: 'Anthemic Call-and-Response Segment', duration: '7 min', energy: '92%', tempo: 'Dance (132 BPM)', cue: 'Band breakdown; vocal chant with left vs right crowd competition' },
+      { order: 6, title: 'Peak Dance Floor Banger (Mega Medley)', duration: '12 min', energy: '98%', tempo: 'Full Throttle', cue: 'Full dynamic sound blast; CO2 / haze machines if available' },
+      { order: 7, title: 'High-Energy Climax & Grand Finale Encore', duration: '6 min', energy: '100%', tempo: 'Peak Euphoria', cue: 'All instruments crescendo; band introduction & closing bows' },
+    ],
+    stageRider: {
+      audioChannels: [
+        'Ch 1: Lead Vocal Microphone (Shure SM58 / Beta 58A Wireless)',
+        'Ch 2: Backing Vocal / Instrumentalist Mic',
+        'Ch 3-4: Stereo Keyboard / Synthesizer (2x Active DI Boxes)',
+        'Ch 5: Acoustic / Electric Guitar DI (Stereo Processor)',
+        'Ch 6-7: Percussion / Dholak / Octapad (Stereo Pair)',
+        'Ch 8-11: Drum Kit / Bass / Backing Tracks (L & R Balanced)',
+      ],
+      monitoring: '2x In-Ear Monitor (IEM) wireless mixes + 2x Stage Wedge Monitors (Front L/R)',
+      powerAndStaging: '230V clean spike-protected AC power feeds directly on stage riser (minimum 16x12 ft stage).',
+      greenRoomHospitality: 'Secure air-conditioned green room, bottled mineral water, hot green tea/lemon, private mirror and charging docks.',
+    },
+    runOfShowTimeline: [
+      { time: 'T - 3 Hours', task: 'Band & Sound Engineer Arrival; Stage Riser Placement & Cable Run' },
+      { time: 'T - 2 Hours', task: 'Line Check & Drum/Instrument Tuning; IEM Frequency Calibration' },
+      { time: 'T - 75 Mins', task: 'Full Dynamic Soundcheck with Host/FOH Engineer; Final Level Balancing' },
+      { time: 'T - 30 Mins', task: 'Artist Green Room Hospitality; Vocal Warm-ups & Setlist Review with Client' },
+      { time: 'T - 5 Mins', task: 'FOH Intro Audio Roll; Stage Emcee Artist Introduction' },
+      { time: 'Showtime', task: `Live Performance Launch (${totalMins} minutes uninterrupted stage set)` },
+      { time: 'Post-Show', task: 'Encore, Fan Photos & Meet-and-Greet with Event Host' },
+    ],
+    crowdEngagementTips: [
+      'Learn the event VIP names (Bride/Groom or Corporate MD) and give a spontaneous shout-out before Song 3.',
+      'Split the audience in two halves during the chorus call-and-response to ignite friendly singing competition.',
+      'Step down to the stage apron or ramp during the ballad to create an intimate, memorable photo moment.',
+      'Keep instrumental intermissions under 15 seconds to maintain unbroken dance floor momentum.',
+    ],
+  };
+
+  res.json({ success: true, plan });
 });
 
 export default router;

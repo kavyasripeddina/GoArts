@@ -99,7 +99,7 @@ export function LoginPage() {
               <label className="form-label">Password</label>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                <input className="form-input" style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }} type={showPwd ? 'text' : 'password'} placeholder="Your password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} autoComplete="new-password" />
+                <input className="form-input" style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }} type={showPwd ? 'text' : 'password'} placeholder="Your password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPwd(!showPwd)} style={{ position: 'absolute', right: '0.875rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                   {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -156,10 +156,11 @@ export function RegisterPage() {
   ];
 
   const PRESET_AVATARS = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80',
+    `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="p1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4285F4"/><stop offset="100%" stop-color="#1E40AF"/></linearGradient></defs><rect width="120" height="120" rx="60" fill="url(#p1)"/><text x="60" y="68" font-size="44" text-anchor="middle" fill="#fff">🎤</text></svg>')}`,
+    `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="p2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#BC4639"/><stop offset="100%" stop-color="#7F1D1D"/></linearGradient></defs><rect width="120" height="120" rx="60" fill="url(#p2)"/><text x="60" y="68" font-size="44" text-anchor="middle" fill="#fff">🎸</text></svg>')}`,
+    `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="p3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#10B981"/><stop offset="100%" stop-color="#065F46"/></linearGradient></defs><rect width="120" height="120" rx="60" fill="url(#p3)"/><text x="60" y="68" font-size="44" text-anchor="middle" fill="#fff">🎧</text></svg>')}`,
+    `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="p4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#4C1D95"/></linearGradient></defs><rect width="120" height="120" rx="60" fill="url(#p4)"/><text x="60" y="68" font-size="44" text-anchor="middle" fill="#fff">🎭</text></svg>')}`,
+    `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="p5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#B45309"/></linearGradient></defs><rect width="120" height="120" rx="60" fill="url(#p5)"/><text x="60" y="68" font-size="44" text-anchor="middle" fill="#fff">✨</text></svg>')}`,
   ];
 
   const handlePhotoUpload = (e) => {
@@ -198,6 +199,26 @@ export function RegisterPage() {
   const hasLower = /[a-z]/.test(form.password);
   const hasNumber = /\d/.test(form.password);
   const hasSymbol = /[@$!%*?&#_\-+=~^()[\]{}|:;,.<>]/.test(form.password);
+
+  const generateStrongPassword = () => {
+    const lowers = 'abcdefghijkmnopqrstuvwxyz';
+    const uppers = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const numbers = '23456789';
+    const symbols = '!@#$%&*_-+=';
+    let pwd = '';
+    pwd += uppers[Math.floor(Math.random() * uppers.length)];
+    pwd += lowers[Math.floor(Math.random() * lowers.length)];
+    pwd += numbers[Math.floor(Math.random() * numbers.length)];
+    pwd += symbols[Math.floor(Math.random() * symbols.length)];
+    const all = lowers + uppers + numbers + symbols;
+    for (let i = 0; i < 8; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)];
+    }
+    pwd = pwd.split('').sort(() => 0.5 - Math.random()).join('');
+    setForm(p => ({ ...p, password: pwd, confirmPassword: pwd }));
+    setShowPwd(true);
+    toast.success('Generated strong secure password!');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -366,18 +387,20 @@ export function RegisterPage() {
                     )}
                   </div>
 
-                  {form.role === 'artist' && !avatar && (
+                  {!avatar && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Or choose preset:</span>
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Or choose avatar icon:</span>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
                         {PRESET_AVATARS.map((pImg, idx) => (
                           <img
                             key={idx}
                             src={pImg}
-                            alt="Preset"
+                            alt="Preset Avatar"
                             onClick={() => setAvatar(pImg)}
-                            style={{ width: '22px', height: '22px', borderRadius: '50%', cursor: 'pointer', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }}
-                            title="Select preset portrait"
+                            style={{ width: '28px', height: '28px', borderRadius: '50%', cursor: 'pointer', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.3)', transition: 'transform 0.15s' }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            title="Select preset avatar icon"
                           />
                         ))}
                       </div>
@@ -571,8 +594,30 @@ export function RegisterPage() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem', marginBottom: '0.75rem' }}>
-              <div className="form-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', marginBottom: '0.35rem' }}>
+              <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>Security & Password</label>
+              <button
+                type="button"
+                onClick={generateStrongPassword}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#4285F4',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  padding: 0,
+                }}
+              >
+                ✨ Suggest Strong Unique Password
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Password</label>
                 <div style={{ position: 'relative' }}>
                   <Lock size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
@@ -583,6 +628,7 @@ export function RegisterPage() {
                     placeholder="Strong password"
                     value={form.password}
                     onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -595,7 +641,7 @@ export function RegisterPage() {
                 {errors.password && <span className="form-error">{errors.password}</span>}
               </div>
 
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Confirm Password</label>
                 <div style={{ position: 'relative' }}>
                   <Lock size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
@@ -606,6 +652,7 @@ export function RegisterPage() {
                     placeholder="Repeat password"
                     value={form.confirmPassword}
                     onChange={e => setForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                    autoComplete="new-password"
                   />
                 </div>
                 {errors.confirmPassword && <span className="form-error">{errors.confirmPassword}</span>}

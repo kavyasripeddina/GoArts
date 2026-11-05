@@ -171,6 +171,10 @@ router.post('/register', async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const userId = newId();
+    const userAvatar = (avatar && typeof avatar === 'string' && avatar.trim())
+      ? avatar.trim()
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(trimmedName)}&background=4285F4&color=fff&size=500&bold=true`;
+
     const user = {
       id: userId,
       email: normalizedEmail,
@@ -179,7 +183,7 @@ router.post('/register', async (req, res) => {
       name: trimmedName,
       phone: phone ? String(phone).trim() : '',
       city: city ? String(city).trim() : 'Hyderabad',
-      avatar: avatar && typeof avatar === 'string' ? avatar.trim() : '',
+      avatar: userAvatar,
       isActive: true,
       isVerified: true,
       aadhaarVerified: false,
@@ -194,8 +198,10 @@ router.post('/register', async (req, res) => {
     // If artist role, handle verification, tier classification & anti-impersonation
     if (role === 'artist') {
       const artistCat = category || 'Singer';
-      const userPhoto = user.avatar;
-      const artistImg = userPhoto || getUniqueArtistImage(artistCat, trimmedName);
+      // Respect user's uploaded photo/chosen avatar; fallback to clean initial identicon, never recycle stock photos of strangers
+      const artistImg = (avatar && typeof avatar === 'string' && avatar.trim())
+        ? avatar.trim()
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(trimmedName)}&background=4285F4&color=fff&size=500&bold=true`;
 
       // Check for celebrity name match or established tier claim
       const isCelebrityMatch = KNOWN_CELEBRITIES.some((celeb) =>

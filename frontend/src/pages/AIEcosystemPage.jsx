@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar, Footer } from '../components/shared';
 import { aiAPI, artistsAPI } from '../lib/api';
+import { useAuth } from '../context/useAuth';
 import {
   Brain,
   Zap,
@@ -45,21 +46,59 @@ const CATEGORIES = ['Singer', 'Band', 'DJ', 'Dancer', 'Comedian', 'Instrumentali
 const CITIES = ['Hyderabad', 'Mumbai', 'Delhi', 'Bengaluru', 'Chennai', 'Pune', 'Kolkata', 'Ahmedabad'];
 const LANGUAGES = ['Telugu', 'Hindi', 'Tamil', 'Kannada', 'English', 'Gujarati', 'Marathi', 'Punjabi'];
 
+export const generateAvatarSvg = (name = 'Artist', category = 'Performer', size = 200) => {
+  const safeName = (name && typeof name === 'string' && name.trim()) ? name.trim() : 'Artist';
+  const initials = safeName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase() || 'GA';
+  
+  const gradients = [
+    ['#4285F4', '#1E40AF'],
+    ['#BC4639', '#7F1D1D'],
+    ['#10B981', '#065F46'],
+    ['#8B5CF6', '#4C1D95'],
+    ['#F59E0B', '#B45309'],
+  ];
+  let hash = 0;
+  for (let i = 0; i < safeName.length; i++) hash = (hash << 5) - hash + safeName.charCodeAt(i);
+  const [c1, c2] = gradients[Math.abs(hash) % gradients.length];
+  const catLabel = (category || 'Talent').toUpperCase();
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <defs>
+      <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${c1}"/>
+        <stop offset="100%" stop-color="${c2}"/>
+      </linearGradient>
+    </defs>
+    <rect width="${size}" height="${size}" rx="${size > 80 ? 18 : 10}" fill="url(#g_${Math.abs(hash)})"/>
+    <text x="50%" y="46%" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="${Math.round(size * 0.34)}" fill="#ffffff" dominant-baseline="central" text-anchor="middle">${initials}</text>
+    <text x="50%" y="78%" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="${Math.max(9, Math.round(size * 0.11))}" fill="rgba(255,255,255,0.85)" letter-spacing="1px" dominant-baseline="central" text-anchor="middle">${catLabel}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
 const getArtistName = (artist) => {
   if (!artist) return 'Verified Artist';
-  return artist.displayName || artist.name || 'Verified Artist';
+  return (
+    artist.displayName ||
+    artist.name ||
+    artist.stageName ||
+    artist.userName ||
+    (artist.category ? `${artist.category} Performer` : 'GoArts Artist')
+  );
 };
 
 const getArtistImage = (artist) => {
-  if (!artist) return 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80';
+  if (!artist) return generateAvatarSvg('Artist', 'Talent');
   const name = getArtistName(artist);
-  return (
-    artist.image ||
-    artist.avatar ||
-    artist.images?.[0] ||
-    artist.userAvatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4285F4&color=fff&size=200`
-  );
+  const category = artist.category || 'Talent';
+  const img = artist.image || artist.profileImage || artist.avatar || artist.images?.[0] || artist.userAvatar;
+  return (img && typeof img === 'string' && img.trim().length > 0 && !img.includes('undefined')) ? img.trim() : generateAvatarSvg(name, category);
 };
 
 function ScoreBar({ score, max = 100, color = '#4285F4' }) {
@@ -171,7 +210,7 @@ function MatchingTab() {
                       src={artistImg}
                       alt={artistName}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(artistName)}&background=4285F4&color=fff`; }}
+                      onError={(e) => { e.currentTarget.src = generateAvatarSvg(artistName, m.artist.category, 120); }}
                     />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -404,7 +443,7 @@ function RatingTab() {
                   alt={name}
                   style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)' }}
                   onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4285F4&color=fff&size=40`;
+                    e.currentTarget.src = generateAvatarSvg(name, a.category, 80);
                   }}
                 />
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -897,10 +936,332 @@ function PredictionTab() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// TAB 6: AI GIG MANAGER & LIVE SHOW PREPARATION (FOR ARTISTS)
+// ─────────────────────────────────────────────────────────────
+function GigPrepTab() {
+  const { user } = useAuth();
+  const [form, setForm] = useState({
+    eventType: 'Wedding Sangeet',
+    durationMinutes: 90,
+    audienceVibe: 'High Energy & Dance',
+    genre: 'Tollywood & Bollywood Live Hits',
+    venueType: 'Outdoor Banquet Lawn',
+    specialRequests: ''
+  });
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleGenerate = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await aiAPI.gigPrep(form);
+      setResult(data.plan);
+      toast.success('🎉 Gig Blueprint & Technical Rider synthesized!');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to generate gig preparation plan.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (!result) return;
+    const summary = `GoArts AI Live Gig Blueprint: ${result.eventType} (${result.durationMinutes} mins)
+Genre: ${result.genre} | Vibe: ${result.audienceVibe} | Venue: ${result.venueType}
+
+SETLIST:
+${result.curatedSetlist?.map(s => `${s.order}. ${s.title} (${s.duration}) - Tempo: ${s.tempo} | Cue: ${s.cue}`).join('\n')}
+
+AUDIO STAGE RIDER:
+${result.stageRider?.audioChannels?.join('\n')}
+Monitoring: ${result.stageRider?.monitoring}
+Hospitality: ${result.stageRider?.greenRoomHospitality}
+
+RUN OF SHOW:
+${result.runOfShowTimeline?.map(t => `${t.time}: ${t.task}`).join('\n')}
+
+CROWD TACTICS:
+${result.crowdEngagementTips?.map(c => `• ${c}`).join('\n')}`;
+
+    navigator.clipboard.writeText(summary);
+    setCopied(true);
+    toast.success('✓ Complete Gig Blueprint copied to clipboard!');
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Sparkles size={24} color="#f59e0b" /> AI Gig Manager & Live Show Prep
+            </h2>
+            <span style={{ fontSize: '0.75rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '99px' }}>
+              Artist Show Command Center
+            </span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.35rem' }}>
+            Built specifically for performing artists: Generate tailored setlists with BPM & energy curves, stage audio channel patch lists, soundcheck runsheets, and audience engagement tactics.
+          </p>
+        </div>
+        {result && (
+          <button
+            type="button"
+            onClick={copyToClipboard}
+            className="btn btn-outline btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+          >
+            {copied ? '✓ Copied' : '📋 Copy Gig Blueprint'}
+          </button>
+        )}
+      </div>
+
+      {/* Gig Parameters Form */}
+      <form onSubmit={handleGenerate} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.75rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          <div>
+            <label className="form-label" style={{ fontWeight: 700 }}>Event / Gig Type</label>
+            <select className="form-input" value={form.eventType} onChange={e => setForm(p => ({ ...p, eventType: e.target.value }))}>
+              <option value="Wedding Sangeet">Wedding Sangeet</option>
+              <option value="College Festival Headline">College Festival Headline</option>
+              <option value="Corporate Annual Gala">Corporate Annual Gala</option>
+              <option value="Club / Lounge Night">Club / Lounge Night</option>
+              <option value="Concert & Arena Tour">Concert & Arena Tour</option>
+              <option value="Private VIP Anniversary">Private VIP Anniversary</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontWeight: 700 }}>Show Duration</label>
+            <select className="form-input" value={form.durationMinutes} onChange={e => setForm(p => ({ ...p, durationMinutes: Number(e.target.value) }))}>
+              <option value={45}>45 Minutes (Short Showcase)</option>
+              <option value={60}>60 Minutes (Standard Club Set)</option>
+              <option value={90}>90 Minutes (Full Headliner Set)</option>
+              <option value={120}>120 Minutes (Extended Concert)</option>
+              <option value={180}>180 Minutes (Marathon Gig / Sangeet)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontWeight: 700 }}>Crowd Vibe & Energy Target</label>
+            <select className="form-input" value={form.audienceVibe} onChange={e => setForm(p => ({ ...p, audienceVibe: e.target.value }))}>
+              <option value="High Energy & Dance">High Energy & Dance (Peak Tempo)</option>
+              <option value="Romantic, Soulful & Acoustic">Romantic, Soulful & Acoustic</option>
+              <option value="Euphoric EDM & Drop Festival">Euphoric EDM & Drop Festival</option>
+              <option value="Sufi, Retro & Ghazal Fusion">Sufi, Retro & Ghazal Fusion</option>
+              <option value="Corporate Sophisticated & Upbeat">Corporate Sophisticated & Upbeat</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontWeight: 700 }}>Performance Musical Style</label>
+            <input
+              className="form-input"
+              type="text"
+              value={form.genre}
+              onChange={e => setForm(p => ({ ...p, genre: e.target.value }))}
+              placeholder="e.g. Tollywood & Bollywood Hits, Rock, Sufi"
+            />
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontWeight: 700 }}>Venue Environment</label>
+            <select className="form-input" value={form.venueType} onChange={e => setForm(p => ({ ...p, venueType: e.target.value }))}>
+              <option value="Outdoor Banquet Lawn">Outdoor Banquet Lawn</option>
+              <option value="Indoor Auditorium / Hall">Indoor Auditorium / Hall</option>
+              <option value="Stadium / Open-Air Arena">Stadium / Open-Air Arena</option>
+              <option value="Rooftop Lounge / Club">Rooftop Lounge / Club</option>
+              <option value="Intimate Acoustic Stage">Intimate Acoustic Stage</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1.25rem' }}>
+          <label className="form-label" style={{ fontWeight: 700 }}>Special Client Requests or Custom Notes (Optional)</label>
+          <input
+            className="form-input"
+            type="text"
+            value={form.specialRequests}
+            onChange={e => setForm(p => ({ ...p, specialRequests: e.target.value }))}
+            placeholder="e.g. Include bride couple entry track; shout out company chairman; no heavy bass during dinner"
+          />
+        </div>
+
+        <button type="submit" className="btn btn-primary" disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
+          {loading ? <><Loader2 size={16} className="spin" /> Synthesizing Stage Blueprint...</> : <><Sparkles size={16} /> Synthesize Gig Blueprint & Stage Rider</>}
+        </button>
+      </form>
+
+      {/* Results Display */}
+      {result && (
+        <div style={{ display: 'grid', gap: '1.5rem', animation: 'fadeIn 0.3s ease' }}>
+          
+          {/* 1. Curated Dynamic Setlist */}
+          <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <Music size={20} color="#4285F4" /> AI Curated Dynamic Setlist
+                </h3>
+                <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Sequence optimized for crowd psychology, tempo progression, and peak engagement
+                </p>
+              </div>
+              <span className="badge" style={{ background: 'rgba(66,133,244,0.12)', color: '#4285F4', fontWeight: 800 }}>
+                {result.curatedSetlist?.length || 0} Songs ({result.durationMinutes} Mins)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {result.curatedSetlist?.map((song) => (
+                <div key={song.order} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '0.85rem 1rem', flexWrap: 'wrap' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #4285F4, #BC4639)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', flexShrink: 0 }}>
+                    {song.order}
+                  </div>
+                  <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.92rem' }}>{song.title}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Cue / Stage Direction: <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>"{song.cue}"</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexShrink: 0 }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4285F4' }}>⏱️ {song.duration}</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>🎵 {song.tempo}</span>
+                    <span style={{ fontSize: '0.78rem', background: 'rgba(16,185,129,0.12)', color: '#10b981', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '6px' }}>
+                      ⚡ {song.energy} Energy
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Audio Stage Rider & Technical Patch List */}
+          <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+              <Volume2 size={20} color="#10b981" />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                Professional Audio Stage Rider & Technical Specifications
+              </h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '1rem' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                  FOH Sound Board Channel Patch
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {result.stageRider?.audioChannels?.map((ch, idx) => (
+                    <div key={idx} style={{ padding: '0.35rem 0.5rem', background: 'var(--color-card)', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
+                      • {ch}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '1rem' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                    Monitor Mixes & Stage wedges
+                  </div>
+                  <div style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    {result.stageRider?.monitoring}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '1rem' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                    Power & Stage Riser Spec
+                  </div>
+                  <div style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    {result.stageRider?.powerAndStaging}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '1rem' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                    Green Room Hospitality
+                  </div>
+                  <div style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    {result.stageRider?.greenRoomHospitality}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Run of Show Stage Timeline & Crowd Tactics */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <Calendar size={20} color="#4285F4" />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                  Run of Show Timeline
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {result.runOfShowTimeline?.map((t, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start', fontSize: '0.85rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: 800, color: '#4285F4', minWidth: '95px' }}>{t.time}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{t.task}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <Flame size={20} color="#f59e0b" />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                  Crowd Engagement Tactics
+                </h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {result.crowdEngagementTips?.map((tip, idx) => (
+                  <div key={idx} style={{ padding: '0.75rem 0.9rem', background: 'var(--color-surface)', borderRadius: '10px', border: '1px solid var(--color-border)', fontSize: '0.83rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#10b981', fontWeight: 800 }}>✓</span>
+                    <span>{tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN PAGE COMPONENT
 // ─────────────────────────────────────────────────────────────
 export default function AIEcosystemPage() {
-  const [activeTab, setActiveTab] = useState('matching');
+  const { user } = useAuth();
+  const isArtist = user?.role === 'artist';
+
+  const dynamicTabs = isArtist
+    ? [
+        { id: 'gig-prep', label: 'AI Gig Manager (Show Prep)', icon: Sparkles },
+        { id: 'rating', label: 'AI Talent Rating', icon: Star },
+        { id: 'analytics', label: 'Audience Analytics', icon: BarChart2 },
+        { id: 'prediction', label: 'Event Prediction', icon: TrendingUp },
+        { id: 'matching', label: 'AI Artist Matching', icon: Zap },
+        { id: 'planner', label: 'AI Event Planner', icon: Calendar },
+      ]
+    : [
+        { id: 'matching', label: 'AI Artist Matching', icon: Zap },
+        { id: 'planner', label: 'AI Event Planner', icon: Calendar },
+        { id: 'gig-prep', label: 'AI Gig Manager (Show Prep)', icon: Sparkles },
+        { id: 'rating', label: 'AI Talent Rating', icon: Star },
+        { id: 'analytics', label: 'Audience Analytics', icon: BarChart2 },
+        { id: 'prediction', label: 'Event Prediction', icon: TrendingUp },
+      ];
+
+  const [activeTab, setActiveTab] = useState(isArtist ? 'gig-prep' : 'matching');
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background)' }}>
@@ -920,7 +1281,7 @@ export default function AIEcosystemPage() {
             </div>
             <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
               {[
-                ['🎯 AI Matching', 'Find verified artists'],
+                [isArtist ? '🎤 AI Gig Manager' : '🎯 AI Matching', isArtist ? 'Live show prep & riders' : 'Find verified artists'],
                 ['📋 Event Planner', 'Full blueprint & riders'],
                 ['⭐ Talent Rating', 'AI score /100'],
                 ['📊 Analytics', 'Crowd reaction telemetry'],
@@ -938,7 +1299,7 @@ export default function AIEcosystemPage() {
         <div className="container" style={{ padding: '2rem 1rem' }}>
           {/* Tabs */}
           <div style={{ display: 'flex', gap: '0.25rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)' }}>
-            {TABS.map((tab) => {
+            {dynamicTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
@@ -969,6 +1330,7 @@ export default function AIEcosystemPage() {
           </div>
 
           {/* Tab Content */}
+          {activeTab === 'gig-prep' && <GigPrepTab />}
           {activeTab === 'matching' && <MatchingTab />}
           {activeTab === 'planner' && <PlannerTab />}
           {activeTab === 'rating' && <RatingTab />}

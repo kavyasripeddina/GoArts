@@ -35,12 +35,12 @@ export default function AIPosterCreatorPage() {
     else setLoadingMembership(false);
   }, [user]);
 
-  const isElite = membershipStatus?.isElite || user?.role === 'admin';
+  const hasAccess = membershipStatus?.isPro || membershipStatus?.isElite || user?.role === 'admin';
 
   const handleGenerate = async (e) => {
     e.preventDefault();
-    if (!isElite && !loadingMembership) {
-      toast.error('AI Poster Creator is exclusively available to Elite Members.');
+    if (!hasAccess && !loadingMembership) {
+      toast.error('AI Poster Creator is available to Pro and Elite Members.');
       return;
     }
     if (!form.eventName.trim()) { toast.error('Event name is required.'); return; }
@@ -82,8 +82,8 @@ export default function AIPosterCreatorPage() {
         </div>
 
         <div className="container" style={{ padding: '2rem 1rem' }}>
-          {/* Paywall Banner for non-Elite users */}
-          {!loadingMembership && !isElite && (
+          {/* Paywall Banner for non-Pro/Elite users */}
+          {!loadingMembership && !hasAccess && (
             <div style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(188,70,57,0.12))', border: '2px solid rgba(245,158,11,0.4)', borderRadius: '20px', padding: '1.75rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ background: '#f59e0b', borderRadius: '14px', padding: '0.75rem', display: 'flex' }}>
@@ -91,15 +91,15 @@ export default function AIPosterCreatorPage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.2rem' }}>
-                    Elite Tier Feature — AI Poster Creator
+                    Pro & Elite Feature — AI Poster Creator
                   </h3>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>
-                    Instant commercial concert & event poster creation is an Elite Plan privilege (₹9,999/month).
+                    Instant commercial concert & event poster creation is unlocked for Pro (₹2,999/mo) and Elite (₹9,999/mo) members.
                   </p>
                 </div>
               </div>
               <Link to="/premium" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
-                Upgrade to Elite <ArrowRight size={16} />
+                Upgrade Plan <ArrowRight size={16} />
               </Link>
             </div>
           )}
@@ -139,19 +139,19 @@ export default function AIPosterCreatorPage() {
               <button 
                 type="submit" 
                 className="btn btn-primary btn-full" 
-                disabled={loading || (!isElite && !loadingMembership)} 
+                disabled={loading || (!hasAccess && !loadingMembership)} 
                 style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   gap: '0.5rem',
-                  opacity: (!isElite && !loadingMembership) ? 0.6 : 1
+                  opacity: (!hasAccess && !loadingMembership) ? 0.6 : 1
                 }}
               >
                 {loading ? (
                   <><Loader2 size={16} className="spin" /> Generating...</>
-                ) : !isElite && !loadingMembership ? (
-                  <><Lock size={16} /> Unlock with Elite Membership</>
+                ) : !hasAccess && !loadingMembership ? (
+                  <><Lock size={16} /> Unlock with Pro or Elite Plan</>
                 ) : (
                   <><Palette size={16} /> Generate Poster Concept</>
                 )}

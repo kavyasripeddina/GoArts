@@ -25,6 +25,59 @@ const QUICK_PROMPTS = [
   'How does GoArts escrow and artist booking confirmation work?',
 ];
 
+export const generateAvatarSvg = (name = 'Artist', category = 'Performer', size = 300) => {
+  const safeName = (name && typeof name === 'string' && name.trim()) ? name.trim() : 'Artist';
+  const initials = safeName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase() || 'GA';
+  
+  const gradients = [
+    ['#4285F4', '#1E40AF'],
+    ['#BC4639', '#7F1D1D'],
+    ['#10B981', '#065F46'],
+    ['#8B5CF6', '#4C1D95'],
+    ['#F59E0B', '#B45309'],
+  ];
+  let hash = 0;
+  for (let i = 0; i < safeName.length; i++) hash = (hash << 5) - hash + safeName.charCodeAt(i);
+  const [c1, c2] = gradients[Math.abs(hash) % gradients.length];
+  const catLabel = (category || 'Talent').toUpperCase();
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <defs>
+      <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${c1}"/>
+        <stop offset="100%" stop-color="${c2}"/>
+      </linearGradient>
+    </defs>
+    <rect width="${size}" height="${size}" rx="${size > 100 ? 20 : 10}" fill="url(#g_${Math.abs(hash)})"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${size * 0.42}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+    <text x="50%" y="46%" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="${Math.round(size * 0.32)}" fill="#ffffff" dominant-baseline="central" text-anchor="middle">${initials}</text>
+    <text x="50%" y="78%" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="${Math.max(10, Math.round(size * 0.1))}" fill="rgba(255,255,255,0.85)" letter-spacing="1px" dominant-baseline="central" text-anchor="middle">${catLabel}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
+const getArtistName = (artist) => {
+  if (!artist) return 'Verified Performer';
+  return artist.displayName || artist.name || artist.stageName || (artist.category ? `${artist.category} Performer` : 'GoArts Artist');
+};
+
+const getArtistImage = (artist) => {
+  if (!artist) return generateAvatarSvg('Artist', 'Talent');
+  const name = getArtistName(artist);
+  const category = artist.category || 'Talent';
+  const raw = artist.image || artist.profileImage || artist.images?.[0] || artist.avatar || artist.userAvatar;
+  if (raw && typeof raw === 'string' && raw.trim().length > 0 && !raw.includes('undefined')) {
+    return raw.trim();
+  }
+  return generateAvatarSvg(name, category);
+};
+
 export default function AIPlannerPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -595,17 +648,20 @@ export default function AIPlannerPage() {
                                   }}>
                                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                                       <img 
-                                        src={artist.profileImage} 
-                                        alt={artist.stageName} 
-                                        style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover' }} 
+                                        src={getArtistImage(artist)} 
+                                        alt={getArtistName(artist)} 
+                                        style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0, background: 'rgba(66,133,244,0.1)' }} 
+                                        onError={(e) => { e.currentTarget.src = generateAvatarSvg(getArtistName(artist), artist.category, 120); }}
                                       />
                                       <div>
-                                        <h4 style={{ fontWeight: 700, fontSize: '0.95rem', margin: 0, color: 'var(--text-primary)' }}>{artist.stageName}</h4>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{artist.category} • {artist.city}</p>
+                                        <h4 style={{ fontWeight: 800, fontSize: '0.95rem', margin: 0, color: 'var(--text-primary)' }}>{getArtistName(artist)}</h4>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '2px', fontWeight: 600 }}>{artist.category} • {artist.city}</p>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '2px' }}>
                                           <Star size={12} color="#f59e0b" fill="#f59e0b" />
-                                          <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{artist.rating}</span>
-                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({artist.reviewCount})</span>
+                                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                            {artist.reviewCount > 0 ? Number(artist.rating).toFixed(1) : 'New'}
+                                          </span>
+                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({artist.reviewCount || 0})</span>
                                         </div>
                                       </div>
                                     </div>
@@ -691,7 +747,7 @@ export default function AIPlannerPage() {
                                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff5e3a', textTransform: 'uppercase' }}>
                                   {step.time}
                                 </span>
-                                <p style={{ fontSize: '0.85rem', color: 'rgba(248,248,255,0.85)', marginTop: '2px' }}>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '3px', lineHeight: 1.5, fontWeight: 500 }}>
                                   {step.task}
                                 </p>
                               </div>
@@ -703,7 +759,7 @@ export default function AIPlannerPage() {
                       {/* Technical Rider & Assumptions */}
                       <div style={{
                         background: 'var(--color-card)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        border: '1px solid var(--color-border)',
                         borderRadius: '20px',
                         padding: '1.5rem',
                       }}>
@@ -718,7 +774,7 @@ export default function AIPlannerPage() {
                             </h4>
                             <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                               {planResult.technicalRequirements.map((req, i) => (
-                                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.825rem', color: 'rgba(248,248,255,0.7)' }}>
+                                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
                                   <Check size={14} color="#10b981" style={{ flexShrink: 0, marginTop: '3px' }} />
                                   <span>{req}</span>
                                 </li>
@@ -732,7 +788,7 @@ export default function AIPlannerPage() {
                             </h4>
                             <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                               {planResult.assumptions?.map((ass, i) => (
-                                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.825rem', color: 'rgba(248,248,255,0.7)' }}>
+                                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
                                   <Info size={14} color="#f59e0b" style={{ flexShrink: 0, marginTop: '3px' }} />
                                   <span>{ass}</span>
                                 </li>
@@ -1000,11 +1056,12 @@ export default function AIPlannerPage() {
                           transition: 'transform 0.2s',
                         }}>
                           {/* Image & Match Badge */}
-                          <div style={{ position: 'relative', height: '180px' }}>
+                          <div style={{ position: 'relative', height: '180px', background: 'var(--color-surface)' }}>
                             <img 
-                              src={artist.profileImage} 
-                              alt={artist.stageName} 
+                              src={getArtistImage(artist)} 
+                              alt={getArtistName(artist)} 
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                              onError={(e) => { e.currentTarget.src = generateAvatarSvg(getArtistName(artist), artist.category, 300); }}
                             />
                             <div style={{
                               position: 'absolute',
@@ -1044,10 +1101,12 @@ export default function AIPlannerPage() {
                           <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>{artist.stageName}</h4>
+                                <h4 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{getArtistName(artist)}</h4>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#f59e0b', fontSize: '0.85rem', fontWeight: 700 }}>
                                   <Star size={14} fill="#f59e0b" />
-                                  <span>{artist.rating}</span>
+                                  <span style={{ color: 'var(--text-primary)' }}>
+                                    {artist.reviewCount > 0 ? Number(artist.rating).toFixed(1) : 'New'}
+                                  </span>
                                 </div>
                               </div>
                               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1rem' }}>
