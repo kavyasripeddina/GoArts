@@ -18,9 +18,12 @@ export default function AIPosterCreatorPage() {
     artistName: 'Featured Artist',
     venue: 'Taj Palace, Hyderabad',
     date: '2026-11-13',
+    eventType: 'Concert',
     theme: 'Bold Neon',
     genre: 'Classical',
   });
+  const [isCustomEventType, setIsCustomEventType] = useState(false);
+  const [customEventType, setCustomEventType] = useState('');
   const [concept, setConcept] = useState(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -59,7 +62,8 @@ export default function AIPosterCreatorPage() {
     }
     setLoading(true);
     try {
-      const { data } = await aiAPI.generatePoster(form);
+      const resolvedEventType = isCustomEventType ? customEventType.trim() : form.eventType;
+      const { data } = await aiAPI.generatePoster({ ...form, eventType: resolvedEventType || 'Concert' });
       setConcept(data.concept);
       setViewTab('artwork');
       toast.success('Visual Poster & Concept generated!');
@@ -380,7 +384,7 @@ export default function AIPosterCreatorPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) minmax(320px, 1.4fr)', gap: '2rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', alignItems: 'start' }}>
             {/* Form */}
             <form onSubmit={handleGenerate} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
@@ -398,6 +402,46 @@ export default function AIPosterCreatorPage() {
                   <input className="form-input" placeholder={f.placeholder} value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
                 </div>
               ))}
+
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>Event Type</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomEventType(!isCustomEventType);
+                      if (!isCustomEventType) setCustomEventType(form.eventType || '');
+                    }}
+                    style={{ background: 'transparent', border: 'none', color: '#4285F4', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                  >
+                    {isCustomEventType ? '← List' : '✨ Customized'}
+                  </button>
+                </div>
+                {isCustomEventType ? (
+                  <input
+                    className="form-input"
+                    placeholder="e.g. Sangeet, Music Festival, Club Night"
+                    value={customEventType}
+                    onChange={e => setCustomEventType(e.target.value)}
+                    autoFocus
+                  />
+                ) : (
+                  <select
+                    className="form-input"
+                    value={form.eventType}
+                    onChange={e => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomEventType(true);
+                      } else {
+                        setForm(p => ({ ...p, eventType: e.target.value }));
+                      }
+                    }}
+                  >
+                    {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value="__custom__">✨ Customized / Other Event...</option>
+                  </select>
+                )}
+              </div>
 
               <div style={{ marginBottom: '1rem' }}>
                 <label className="form-label" style={{ fontWeight: 700 }}>Event Date</label>

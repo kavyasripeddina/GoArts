@@ -1038,7 +1038,8 @@ export default function AdminDashboard() {
                     transition: 'all 0.18s ease',
                     background: activeTab === id ? 'linear-gradient(135deg, #4285F4, #BC4639)' : 'transparent',
                     color: activeTab === id ? '#ffffff' : 'var(--text-secondary)',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
                   }}
                 >
                   <Icon size={15} />

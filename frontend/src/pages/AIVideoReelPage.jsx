@@ -447,7 +447,7 @@ export default function AIVideoReelPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(340px, 1.35fr)', gap: '2rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', alignItems: 'start' }}>
             {/* Form */}
             <form onSubmit={handleGenerate} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '1.75rem', boxShadow: 'var(--shadow-sm)' }}>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>
@@ -465,16 +465,31 @@ export default function AIVideoReelPage() {
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label className="form-label" style={{ fontWeight: 700 }}>Event / Showcase Title</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>Event / Showcase Title</label>
+                  <span style={{ fontSize: '0.72rem', color: '#4285F4', fontWeight: 700 }}>Customized or Live Tour</span>
+                </div>
                 <input
                   className="form-input"
-                  placeholder="e.g. Soul & Carnatic Live Arena Tour 2026"
+                  placeholder="e.g. Soul & Carnatic Live Arena Tour 2026, Wedding Sangeet"
                   value={form.eventTitle}
                   onChange={(e) => setForm((p) => ({ ...p, eventTitle: e.target.value }))}
                 />
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                  {['Wedding Sangeet', 'College Fest Headline', 'Arena Concert', 'Club Night'].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, eventTitle: preset }))}
+                      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '999px', padding: '0.15rem 0.55rem', fontSize: '0.68rem', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                   <label className="form-label" style={{ fontWeight: 700 }}>Performance Genre</label>
                   <input

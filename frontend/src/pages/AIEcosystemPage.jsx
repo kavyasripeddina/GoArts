@@ -67,30 +67,39 @@ export const generateAvatarSvg = (name = 'Artist', category = 'Performer', size 
   for (let i = 0; i < safeName.length; i++) hash = (hash << 5) - hash + safeName.charCodeAt(i);
   const [c1, c2] = gradients[Math.abs(hash) % gradients.length];
   const catLabel = (category || 'Talent').toUpperCase();
+  const gradId = 'ga_g_' + Math.abs(hash);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <defs>
-      <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stop-color="${c1}"/>
         <stop offset="100%" stop-color="${c2}"/>
       </linearGradient>
     </defs>
-    <rect width="${size}" height="${size}" rx="${size > 80 ? 18 : 10}" fill="url(#g_${Math.abs(hash)})"/>
+    <rect width="${size}" height="${size}" rx="${size > 80 ? 18 : 10}" fill="${c1}"/>
+    <rect width="${size}" height="${size}" rx="${size > 80 ? 18 : 10}" fill="url(#${gradId})"/>
     <text x="50%" y="46%" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="${Math.round(size * 0.34)}" fill="#ffffff" dominant-baseline="central" text-anchor="middle">${initials}</text>
-    <text x="50%" y="78%" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="${Math.max(9, Math.round(size * 0.11))}" fill="rgba(255,255,255,0.85)" letter-spacing="1px" dominant-baseline="central" text-anchor="middle">${catLabel}</text>
+    <text x="50%" y="78%" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="${Math.max(9, Math.round(size * 0.11))}" fill="rgba(255,255,255,0.92)" letter-spacing="1px" dominant-baseline="central" text-anchor="middle">${catLabel}</text>
   </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  try {
+    const b64 = typeof window !== 'undefined' ? window.btoa(unescape(encodeURIComponent(svg))) : Buffer.from(svg).toString('base64');
+    return `data:image/svg+xml;base64,${b64}`;
+  } catch {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
 };
 
 const getArtistName = (artist) => {
   if (!artist) return 'Verified Artist';
-  return (
+  const candidate = (
     artist.displayName ||
     artist.name ||
     artist.stageName ||
     artist.userName ||
-    (artist.category ? `${artist.category} Performer` : 'GoArts Artist')
-  );
+    ''
+  ).trim();
+  if (candidate && candidate.length > 0) return candidate;
+  return artist.category ? `${artist.category} Performer` : 'GoArts Artist';
 };
 
 const getArtistImage = (artist) => {
@@ -114,6 +123,8 @@ function ScoreBar({ score, max = 100, color = '#4285F4' }) {
 // ─────────────────────────────────────────────────────────────
 function MatchingTab() {
   const [form, setForm] = useState({ eventType: '', category: '', city: '', budget: '', language: '', audienceSize: '', date: '' });
+  const [isCustomEvent, setIsCustomEvent] = useState(false);
+  const [customEvent, setCustomEvent] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -121,7 +132,8 @@ function MatchingTab() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await aiAPI.match(form);
+      const resolvedEventType = isCustomEvent ? customEvent.trim() : form.eventType;
+      const { data } = await aiAPI.match({ ...form, eventType: resolvedEventType });
       setResult(data);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Matching failed. Please try again.');
@@ -140,11 +152,44 @@ function MatchingTab() {
       <form onSubmit={handleMatch} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           <div>
-            <label className="form-label">Event Type</label>
-            <select className="form-input" value={form.eventType} onChange={e => setForm(p => ({ ...p, eventType: e.target.value }))}>
-              <option value="">Any event type</option>
-              {EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}
-            </select>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+              <label className="form-label" style={{ margin: 0 }}>Event Type</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomEvent(!isCustomEvent);
+                  if (!isCustomEvent) setCustomEvent(form.eventType || '');
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#4285F4', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                {isCustomEvent ? '← Choose list' : '✨ Customized'}
+              </button>
+            </div>
+            {isCustomEvent ? (
+              <input
+                className="form-input"
+                placeholder="e.g. Sangeet, Housewarming, Dandiya"
+                value={customEvent}
+                onChange={e => setCustomEvent(e.target.value)}
+                autoFocus
+              />
+            ) : (
+              <select
+                className="form-input"
+                value={form.eventType}
+                onChange={e => {
+                  if (e.target.value === '__custom__') {
+                    setIsCustomEvent(true);
+                  } else {
+                    setForm(p => ({ ...p, eventType: e.target.value }));
+                  }
+                }}
+              >
+                <option value="">Any event type</option>
+                {EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}
+                <option value="__custom__">✨ Customized / Other Event...</option>
+              </select>
+            )}
           </div>
           <div>
             <label className="form-label">Performer Category</label>
@@ -243,15 +288,18 @@ function MatchingTab() {
 function PlannerTab() {
   const [description, setDescription] = useState('');
   const [extraFields, setExtraFields] = useState({ eventType: '', city: '', budget: '', audienceSize: '' });
+  const [isCustomEvent, setIsCustomEvent] = useState(false);
+  const [customEvent, setCustomEvent] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handlePlan = async (e) => {
     e.preventDefault();
-    if (!description.trim() && !extraFields.eventType) { toast.error('Please describe your event.'); return; }
+    const resolvedEventType = isCustomEvent ? customEvent.trim() : extraFields.eventType;
+    if (!description.trim() && !resolvedEventType) { toast.error('Please describe your event or select an event type.'); return; }
     setLoading(true);
     try {
-      const { data } = await aiAPI.plan({ description, ...extraFields });
+      const { data } = await aiAPI.plan({ description, ...extraFields, eventType: resolvedEventType });
       setResult(data.plan);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Planning failed. Please try again.');
@@ -273,7 +321,46 @@ function PlannerTab() {
           <textarea className="form-input" rows={4} placeholder={`Example: "I need a college fest for 2000 students with live music and celebrity appearance in Hyderabad with a budget of ₹5 lakhs."`} value={description} onChange={e => setDescription(e.target.value)} style={{ resize: 'vertical' }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-          <div><label className="form-label">Event Type (optional)</label><select className="form-input" value={extraFields.eventType} onChange={e => setExtraFields(p => ({ ...p, eventType: e.target.value }))}><option value="">Auto-detect</option>{EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}</select></div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+              <label className="form-label" style={{ margin: 0 }}>Event Type (optional)</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomEvent(!isCustomEvent);
+                  if (!isCustomEvent) setCustomEvent(extraFields.eventType || '');
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#4285F4', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                {isCustomEvent ? '← List' : '✨ Customized'}
+              </button>
+            </div>
+            {isCustomEvent ? (
+              <input
+                className="form-input"
+                placeholder="e.g. Sangeet, Haldi, Alumni Gala"
+                value={customEvent}
+                onChange={e => setCustomEvent(e.target.value)}
+                autoFocus
+              />
+            ) : (
+              <select
+                className="form-input"
+                value={extraFields.eventType}
+                onChange={e => {
+                  if (e.target.value === '__custom__') {
+                    setIsCustomEvent(true);
+                  } else {
+                    setExtraFields(p => ({ ...p, eventType: e.target.value }));
+                  }
+                }}
+              >
+                <option value="">Auto-detect</option>
+                {EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}
+                <option value="__custom__">✨ Customized / Other Event...</option>
+              </select>
+            )}
+          </div>
           <div><label className="form-label">City (optional)</label><select className="form-input" value={extraFields.city} onChange={e => setExtraFields(p => ({ ...p, city: e.target.value }))}><option value="">Auto-detect</option>{CITIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           <div><label className="form-label">Budget ₹ (optional)</label><input className="form-input" type="number" placeholder="Auto-detect" value={extraFields.budget} onChange={e => setExtraFields(p => ({ ...p, budget: e.target.value }))} /></div>
           <div><label className="form-label">Audience Size</label><input className="form-input" type="number" placeholder="Auto-detect" value={extraFields.audienceSize} onChange={e => setExtraFields(p => ({ ...p, audienceSize: e.target.value }))} /></div>
@@ -405,7 +492,7 @@ function RatingTab() {
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>AI continuously evaluates artists across Profile Completeness, Verified Identity, Client Reviews, Booking Completion, and Responsiveness to generate a verified Score out of 100.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) 2fr', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
         {/* Left: Artists Selector List */}
         <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '1rem', maxHeight: '580px', overflowY: 'auto' }}>
           <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.5px' }}>SELECT ARTIST</div>
@@ -441,8 +528,9 @@ function RatingTab() {
                 <img
                   src={img}
                   alt={name}
-                  style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)' }}
+                  style={{ width: '40px', height: '40px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)', background: 'var(--color-surface)' }}
                   onError={(e) => {
+                    e.currentTarget.onerror = null;
                     e.currentTarget.src = generateAvatarSvg(name, a.category, 80);
                   }}
                 />
@@ -451,7 +539,7 @@ function RatingTab() {
                     {name}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {a.category} • {a.city}
+                    {a.category || 'Performer'} {a.city ? `• ${a.city}` : ''}
                   </div>
                 </div>
               </button>
@@ -851,15 +939,18 @@ function AnalyticsTab() {
 // ─────────────────────────────────────────────────────────────
 function PredictionTab() {
   const [form, setForm] = useState({ city: '', eventType: '', date: '', budget: '', audienceSize: '' });
+  const [isCustomEvent, setIsCustomEvent] = useState(false);
+  const [customEvent, setCustomEvent] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handlePredict = async (e) => {
     e.preventDefault();
-    if (!form.city && !form.eventType) { toast.error('Please provide at least a city or event type.'); return; }
+    const resolvedEventType = isCustomEvent ? customEvent.trim() : form.eventType;
+    if (!form.city && !resolvedEventType) { toast.error('Please provide at least a city or event type.'); return; }
     setLoading(true);
     try {
-      const { data } = await aiAPI.predictEvent(form);
+      const { data } = await aiAPI.predictEvent({ ...form, eventType: resolvedEventType });
       setResult(data.prediction);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Prediction failed.');
@@ -878,7 +969,46 @@ function PredictionTab() {
       <form onSubmit={handlePredict} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           <div><label className="form-label">City *</label><select className="form-input" value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))}><option value="">Select city</option>{CITIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-          <div><label className="form-label">Event Type *</label><select className="form-input" value={form.eventType} onChange={e => setForm(p => ({ ...p, eventType: e.target.value }))}><option value="">Select type</option>{EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}</select></div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+              <label className="form-label" style={{ margin: 0 }}>Event Type *</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomEvent(!isCustomEvent);
+                  if (!isCustomEvent) setCustomEvent(form.eventType || '');
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#4285F4', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                {isCustomEvent ? '← List' : '✨ Customized'}
+              </button>
+            </div>
+            {isCustomEvent ? (
+              <input
+                className="form-input"
+                placeholder="e.g. Sangeet, Dandiya, Expo"
+                value={customEvent}
+                onChange={e => setCustomEvent(e.target.value)}
+                autoFocus
+              />
+            ) : (
+              <select
+                className="form-input"
+                value={form.eventType}
+                onChange={e => {
+                  if (e.target.value === '__custom__') {
+                    setIsCustomEvent(true);
+                  } else {
+                    setForm(p => ({ ...p, eventType: e.target.value }));
+                  }
+                }}
+              >
+                <option value="">Select type</option>
+                {EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}
+                <option value="__custom__">✨ Customized / Other Event...</option>
+              </select>
+            )}
+          </div>
           <div><label className="form-label">Target Date</label><input className="form-input" type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} min={new Date().toISOString().split('T')[0]} /></div>
           <div><label className="form-label">Budget ₹</label><input className="form-input" type="number" placeholder="Your budget" value={form.budget} onChange={e => setForm(p => ({ ...p, budget: e.target.value }))} /></div>
         </div>
@@ -950,6 +1080,8 @@ function GigPrepTab() {
     venueType: 'Outdoor Banquet Lawn',
     specialRequests: ''
   });
+  const [isCustomEvent, setIsCustomEvent] = useState(false);
+  const [customEvent, setCustomEvent] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -958,7 +1090,8 @@ function GigPrepTab() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await aiAPI.gigPrep(form);
+      const resolvedEventType = isCustomEvent ? customEvent.trim() : form.eventType;
+      const { data } = await aiAPI.gigPrep({ ...form, eventType: resolvedEventType || 'Live Event' });
       setResult(data.plan);
       toast.success('🎉 Gig Blueprint & Technical Rider synthesized!');
     } catch (err) {
@@ -1025,15 +1158,48 @@ ${result.crowdEngagementTips?.map(c => `• ${c}`).join('\n')}`;
       <form onSubmit={handleGenerate} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.75rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           <div>
-            <label className="form-label" style={{ fontWeight: 700 }}>Event / Gig Type</label>
-            <select className="form-input" value={form.eventType} onChange={e => setForm(p => ({ ...p, eventType: e.target.value }))}>
-              <option value="Wedding Sangeet">Wedding Sangeet</option>
-              <option value="College Festival Headline">College Festival Headline</option>
-              <option value="Corporate Annual Gala">Corporate Annual Gala</option>
-              <option value="Club / Lounge Night">Club / Lounge Night</option>
-              <option value="Concert & Arena Tour">Concert & Arena Tour</option>
-              <option value="Private VIP Anniversary">Private VIP Anniversary</option>
-            </select>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+              <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>Event / Gig Type</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomEvent(!isCustomEvent);
+                  if (!isCustomEvent) setCustomEvent(form.eventType || '');
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#4285F4', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                {isCustomEvent ? '← List' : '✨ Customized'}
+              </button>
+            </div>
+            {isCustomEvent ? (
+              <input
+                className="form-input"
+                placeholder="e.g. Sangeet, College Fest Headline"
+                value={customEvent}
+                onChange={e => setCustomEvent(e.target.value)}
+                autoFocus
+              />
+            ) : (
+              <select
+                className="form-input"
+                value={form.eventType}
+                onChange={e => {
+                  if (e.target.value === '__custom__') {
+                    setIsCustomEvent(true);
+                  } else {
+                    setForm(p => ({ ...p, eventType: e.target.value }));
+                  }
+                }}
+              >
+                <option value="Wedding Sangeet">Wedding Sangeet</option>
+                <option value="College Festival Headline">College Festival Headline</option>
+                <option value="Corporate Annual Gala">Corporate Annual Gala</option>
+                <option value="Club / Lounge Night">Club / Lounge Night</option>
+                <option value="Concert & Arena Tour">Concert & Arena Tour</option>
+                <option value="Private VIP Anniversary">Private VIP Anniversary</option>
+                <option value="__custom__">✨ Customized / Other Gig Type...</option>
+              </select>
+            )}
           </div>
 
           <div>

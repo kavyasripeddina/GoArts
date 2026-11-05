@@ -512,12 +512,10 @@ export function AadhaarVerificationModal({ user, onClose, onSuccess }) {
         aadhaarNumber: aadhaarNumber.trim(),
         legalName: legalName.trim(),
         idType,
-        submitForAdminReview: user?.role === 'customer',
+        submitForAdminReview: true,
       });
       toast.success(
-        user?.role === 'customer'
-          ? '📋 Government ID submitted to Admin for verification and approval!'
-          : '🛡️ Government ID Verified Successfully!'
+        data.message || '📋 Government ID submitted for Admin approval! Once verified by GoArts Admin, your verified shield badge will be activated.'
       );
       onSuccess(data.user);
       onClose();

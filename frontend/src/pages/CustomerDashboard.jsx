@@ -149,6 +149,10 @@ export default function CustomerDashboard() {
                 <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '999px', padding: '0.25rem 0.6rem', fontSize: '0.7rem', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                   <ShieldCheck size={13} /> Govt ID Verified
                 </div>
+              ) : user?.aadhaarStatus === 'under_review' ? (
+                <div style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '999px', padding: '0.25rem 0.6rem', fontSize: '0.7rem', color: '#f59e0b', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }} title="Aadhaar submitted to Admin for approval">
+                  <Clock size={13} /> ⏳ Aadhaar Under Admin Review
+                </div>
               ) : (
                 <button
                   onClick={() => setShowKycModal(true)}

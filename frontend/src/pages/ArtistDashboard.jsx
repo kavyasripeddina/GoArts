@@ -165,6 +165,10 @@ export default function ArtistDashboard() {
                 <span style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '999px', padding: '0.2rem 0.6rem', fontSize: '0.7rem', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                   <ShieldCheck size={12} /> Govt ID Verified
                 </span>
+              ) : (user?.aadhaarStatus === 'under_review' || artist?.verificationStatus === 'under_review') ? (
+                <span style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '999px', padding: '0.2rem 0.6rem', fontSize: '0.7rem', color: '#f59e0b', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Clock size={12} /> Aadhaar Awaiting Admin Approval
+                </span>
               ) : (
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowKycModal(true); }}
@@ -788,7 +792,7 @@ export default function ArtistDashboard() {
           onClose={() => setShowKycModal(false)}
           onSuccess={(updatedUser) => {
             updateUser(updatedUser);
-            if (artist) setArtist(prev => ({ ...prev, aadhaarVerified: true, verified: true }));
+            if (artist) setArtist(prev => ({ ...prev, aadhaarStatus: updatedUser.aadhaarStatus || 'under_review', aadhaarVerified: updatedUser.aadhaarVerified || false }));
           }}
         />
       )}

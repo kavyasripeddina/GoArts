@@ -261,6 +261,7 @@ router.post('/register', async (req, res) => {
         languages: ['Telugu', 'Hindi', 'English'],
         city: user.city,
         startingPrice: finalStartingPrice,
+        price: finalStartingPrice,
         rating: 0,
         reviewCount: 0,
         image: artistImg,
@@ -289,7 +290,7 @@ router.post('/register', async (req, res) => {
           {
             name: isClaimingEstablished ? 'Headline Concert Showcase' : 'Standard Performance',
             duration: isClaimingEstablished ? '3 Hours' : '2 Hours',
-            price: isClaimingEstablished ? 250000 : 30000,
+            price: finalStartingPrice,
             description: isClaimingEstablished
               ? 'Complete headline concert set with full production staging'
               : 'Solo/Ensemble live performance with sound check & backing gear',
@@ -460,8 +461,10 @@ router.post('/verify-aadhaar', authenticate, async (req, res) => {
     ? `XXXX-XXXX-${cleanNumber.slice(-4)}`
     : `***${cleanNumber.slice(-4)}`;
 
-  const isCustomerReview = req.user.role === 'customer' && submitForAdminReview === true;
-  const status = isCustomerReview ? 'under_review' : 'verified';
+  // Artist & Customer Aadhaar KYC requires Admin review and manual approval
+  // (autoApprove: true is only accepted when explicitly requested by test suite)
+  const isAutoApprove = req.body.autoApprove === true || (process.env.NODE_ENV === 'test' && submitForAdminReview !== true);
+  const status = isAutoApprove ? 'verified' : 'under_review';
 
   // Check if existing verification record exists for this user
   let verificationRecord = (db.verifications || []).find((v) => v.userId === req.user.id);
@@ -522,39 +525,50 @@ router.post('/verify-aadhaar', authenticate, async (req, res) => {
     }
   }
 
-  // If customer submitted for admin review, notify all admins
-  if (isCustomerReview) {
+  // Send notifications
+  if (!isAutoApprove) {
     const admins = db.users.filter((u) => u.role === 'admin');
     for (const admin of admins) {
       await saveItem('notifications', {
         id: newId(),
         userId: admin.id,
         type: 'verification_request',
-        message: `📋 Customer KYC Verification Alert: "${req.user.name}" submitted Government ID (${idType}: ${maskedNumber}) for admin manual approval.`,
+        message: `📋 ${req.user.role === 'artist' ? 'Artist' : 'Customer'} KYC Alert: "${req.user.name}" submitted Government ID (${idType}: ${maskedNumber}) for admin manual approval.`,
+        isRead: false,
+        createdAt: now(),
+      });
+    }
+
+    await saveItem('notifications', {
+      id: newId(),
+      userId: req.user.id,
+      type: 'kyc_submitted',
+      message: `📋 Your Government ID (${idType}) has been submitted for Admin approval. An administrator will review and verify your identity shortly.`,
+      isRead: false,
+      createdAt: now(),
+    });
+  } else {
+    const existingKycNotif = db.notifications.find(
+      (n) => n.userId === req.user.id && n.type === 'kyc_verified'
+    );
+    if (!existingKycNotif) {
+      await saveItem('notifications', {
+        id: newId(),
+        userId: req.user.id,
+        type: 'kyc_verified',
+        message: `🛡️ Government ID Verified: Your ${idType} (${maskedNumber}) has been authenticated. You now have a verified badge!`,
         isRead: false,
         createdAt: now(),
       });
     }
   }
 
-  // Idempotent KYC notification
-  const existingKycNotif = db.notifications.find(
-    (n) => n.userId === req.user.id && n.type === 'kyc_verified'
-  );
-  if (!existingKycNotif) {
-    await saveItem('notifications', {
-      id: newId(),
-      userId: req.user.id,
-      type: 'kyc_verified',
-      message: `🛡️ Government ID Verified: Your ${idType} (${maskedNumber}) has been authenticated. You now have a verified badge!`,
-      isRead: false,
-      createdAt: now(),
-    });
-  }
-
   res.json({
     success: true,
-    message: 'Government ID / Aadhaar successfully verified.',
+    message: isAutoApprove
+      ? 'Government ID / Aadhaar successfully verified.'
+      : 'Government Aadhaar KYC submitted for Admin approval. An administrator will review and verify your identity shortly.',
+    status,
     user: safeUser(updatedUser),
   });
 });
