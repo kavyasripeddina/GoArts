@@ -24,6 +24,7 @@ import {
   Clock,
   ArrowRight,
   Maximize2,
+  Image,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 

@@ -87,6 +87,7 @@ export const Navbar = ({ transparent = false }) => {
   const notifRef = useRef(null);
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -207,27 +208,79 @@ export const Navbar = ({ transparent = false }) => {
     return '/dashboard';
   };
 
+  const currentPathWithSearch = location.pathname + (location.search || '');
+  const isItemActive = (href) => {
+    if (href.includes('?')) return currentPathWithSearch === href;
+    return location.pathname === href && !location.search;
+  };
+
+  const navItems = user?.role === 'admin' ? [
+    ['Command Center', '/admin'],
+    ['Artist Verifications', '/admin?tab=verifications'],
+    ['Customer KYC', '/admin?tab=customer-kyc'],
+    ['Memberships Ledger', '/admin?tab=memberships'],
+    ['AI Studio', '/ai-ecosystem'],
+    ['Explore Artists', '/artists'],
+    ['Open Gigs Board', '/events'],
+  ] : [
+    ['Explore Artists', '/artists'],
+    ['Open Gigs Board', '/events'],
+    ['Leaderboard', '/leaderboard'],
+    ['AI Planner', '/ai-planner'],
+    ['AI Studio', '/ai-ecosystem'],
+    ['Premium', '/premium'],
+    ['How It Works', '/#how-it-works'],
+  ];
+
   return (
     <nav style={navStyle}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Logo />
+      <div style={{ maxWidth: '1440px', width: '100%', margin: '0 auto', padding: '0 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          <Logo />
+          {user?.role === 'admin' && (
+            <span style={{ fontSize: '0.65rem', background: 'linear-gradient(135deg, rgba(66,133,244,0.15), rgba(188,70,57,0.15))', color: '#4285F4', border: '1px solid rgba(66,133,244,0.3)', borderRadius: '6px', padding: '0.12rem 0.45rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Admin
+            </span>
+          )}
+        </div>
         {/* Desktop Nav */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }} className="desktop-nav">
-          {[
-            ['Explore Artists', '/artists'],
-            ['Open Gigs Board', '/events'],
-            ['Leaderboard', '/leaderboard'],
-            ['AI Planner', '/ai-planner'],
-            ['AI Studio', '/ai-ecosystem'],
-            user?.role === 'admin' ? ['Memberships Ledger', '/admin?tab=memberships'] : ['Premium', '/premium'],
-            ['How It Works', '/#how-it-works']
-          ].map(([label, href]) => (
-            <Link key={label} to={href} style={{ padding: '0.5rem 0.875rem', color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 500, borderRadius: '8px', transition: 'all 0.2s' }}
-              onMouseEnter={e => { e.target.style.color = 'var(--palette-blue)'; e.target.style.background = 'var(--color-surface)'; }}
-              onMouseLeave={e => { e.target.style.color = 'var(--text-secondary)'; e.target.style.background = 'transparent'; }}>
-              {label}
-            </Link>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexWrap: 'nowrap' }} className="desktop-nav">
+          {navItems.map(([label, href]) => {
+            const active = isItemActive(href);
+            return (
+              <Link
+                key={label}
+                to={href}
+                style={{
+                  padding: '0.45rem 0.65rem',
+                  color: active ? '#4285F4' : 'var(--text-secondary)',
+                  background: active ? 'var(--color-surface)' : 'transparent',
+                  fontSize: '0.83rem',
+                  fontWeight: active ? 700 : 500,
+                  borderRadius: '8px',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                  textDecoration: 'none',
+                  flexShrink: 0,
+                  border: active ? '1px solid var(--color-border)' : '1px solid transparent',
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.color = 'var(--palette-blue)';
+                    e.currentTarget.style.background = 'var(--color-surface)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.background = 'transparent';
+                  }
+                }}
+              >
+                {label}
+              </Link>
+            );
+          })}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           
@@ -519,16 +572,24 @@ export const Navbar = ({ transparent = false }) => {
       {/* Mobile Menu */}
       {mobileOpen && (
         <div style={{ background: 'var(--color-midnight)', borderTop: '1px solid var(--color-border)', padding: '1rem' }}>
-          {[
-            ['Explore Artists', '/artists'],
-            ['Open Gigs Board', '/events'],
-            ['Leaderboard', '/leaderboard'],
-            ['AI Planner', '/ai-planner'],
-            ['AI Studio', '/ai-ecosystem'],
-            user?.role === 'admin' ? ['Memberships Ledger', '/admin?tab=memberships'] : ['Premium', '/premium'],
-            ['How It Works', '/#how-it-works']
-          ].map(([label, href]) => (
-            <Link key={label} to={href} onClick={() => setMobileOpen(false)} style={{ display: 'block', padding: '0.75rem 1rem', color: 'var(--text-secondary)', fontSize: '0.9rem', borderRadius: '8px' }}>{label}</Link>
+          {navItems.map(([label, href]) => (
+            <Link
+              key={label}
+              to={href}
+              onClick={() => setMobileOpen(false)}
+              style={{
+                display: 'block',
+                padding: '0.75rem 1rem',
+                color: isItemActive(href) ? '#4285F4' : 'var(--text-secondary)',
+                fontWeight: isItemActive(href) ? 700 : 500,
+                fontSize: '0.9rem',
+                borderRadius: '8px',
+                whiteSpace: 'nowrap',
+                textDecoration: 'none',
+              }}
+            >
+              {label}
+            </Link>
           ))}
           {!user && (
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', padding: '0 1rem' }}>
